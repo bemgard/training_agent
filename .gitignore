@@ -1,5 +1,4 @@
 .env
-data/training.db
 data/raw/
 logs/
 .venv/
