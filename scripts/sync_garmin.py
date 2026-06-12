@@ -80,8 +80,8 @@ def sync():
             if not data:
                 continue
 
-            bb = data.get("bodyBatteryChargedValue")
-            bb_lagst = data.get("bodyBatteryDrainedValue")
+            bb_hogst = data.get("bodyBatteryHighestValue")
+            bb_lagst = data.get("bodyBatteryLowestValue")
             stress = data.get("averageStressLevel")
             vilopuls = data.get("restingHeartRate")
             steg = data.get("totalSteps")
@@ -97,7 +97,7 @@ def sync():
                 dag, vilopuls,
                 data.get("minHeartRate"), data.get("maxHeartRate"),
                 steg, data.get("totalKilocalories"),
-                aktiva_sek, hog_sek, stress, bb, bb_lagst, None
+                aktiva_sek, hog_sek, stress, bb_hogst, bb_lagst, None
             ))
             if result.rowcount > 0:
                 nya_hälsa += 1
@@ -159,10 +159,32 @@ def sync():
         print(f"  ✅ VO2max uppdaterad")
     except Exception as e:
         print(f"  ⚠️  VO2max misslyckades: {e}")
+        
+    # ── 5. Användarprofil ──────────────────────────────────────────
+    print("📥 Hämtar användarprofil...")
+    try:
+        profil = client.get_user_profile()
+        if profil:
+            vikt = profil.get("weight")
+            langd = profil.get("height")
+            if vikt and langd:
+                vikt_kg = round(vikt / 1000, 1)
+                c.execute("DELETE FROM user_profile")
+                c.execute("""
+                    INSERT INTO user_profile (langd_cm, vikt_kg, vo2max)
+                    SELECT ?, ?, vo2max FROM user_profile LIMIT 1
+                """, (langd, vikt_kg))
+                print(f"  ✅ Profil: {langd} cm, {vikt_kg} kg")
+    except Exception as e:
+        print(f"  ⚠️  Profil misslyckades: {e}")
+    
 
     conn.commit()
     conn.close()
     print("\n✅ Synk klar!")
+    
+    
+
 
 if __name__ == "__main__":
     sync()
