@@ -46,20 +46,43 @@ def kmh_till_tempo(kmh):
     sek_per_km = 3600 / kmh
     return f"{int(sek_per_km // 60)}:{int(sek_per_km % 60):02d}/km"
 
+def get_rag_context(fråga: str, antal: int = 3) -> str:
+    try:
+        import chromadb
+        from chromadb.utils import embedding_functions
+
+        CHROMA_DIR = BASE_DIR / "data" / "chroma"
+        client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+        ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+        collection = client.get_collection("training_knowledge", embedding_function=ef)
+        results = collection.query(query_texts=[fråga], n_results=antal)
+
+        if not results["documents"][0]:
+            return ""
+
+        lines = ["\n=== VETENSKAPLIG KUNSKAP ===\n"]
+        for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
+            lines.append(f"[{meta['rubrik']}]")
+            lines.append(doc)
+            lines.append("")
+
+        return "\n".join(lines)
+    except Exception as e:
+        return ""
+
 def get_context(veckor: int = 12) -> str:
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     sedan = (datetime.now() - timedelta(weeks=veckor)).strftime("%Y-%m-%d")
 
-    # ── Användarprofil ─────────────────────────────────────────
     c.execute("SELECT langd_cm, vikt_kg, vo2max FROM user_profile LIMIT 1")
     profil = c.fetchone()
 
-    # ── Senaste VO2max ─────────────────────────────────────────
     c.execute("SELECT vo2max, datum FROM vo2max_history ORDER BY datum DESC LIMIT 1")
     vo2 = c.fetchone()
 
-    # ── Personliga rekord ──────────────────────────────────────
     c.execute("""
         SELECT typ, formaterat, datum FROM personal_records
         WHERE current = 1
@@ -68,7 +91,6 @@ def get_context(veckor: int = 12) -> str:
     """)
     pr = c.fetchall()
 
-    # ── Löppass ────────────────────────────────────────────────
     c.execute("""
         SELECT datum, typ, distans_km, duration_min, snitt_puls, snitt_tempo, plats
         FROM activities
@@ -79,7 +101,6 @@ def get_context(veckor: int = 12) -> str:
     """, (sedan,))
     löppass = c.fetchall()
 
-    # ── All träning veckovis ───────────────────────────────────
     c.execute("""
         SELECT datum, typ, distans_km, duration_min, snitt_puls, plats
         FROM activities
@@ -98,7 +119,6 @@ def get_context(veckor: int = 12) -> str:
         veckor_data[vecka]["km"] += distans_km or 0
         veckor_data[vecka]["typer"].add(label)
 
-    # ── Pulszoner från historik ────────────────────────────────
     def zon_stats(low, high):
         c.execute("""
             SELECT ROUND(AVG(snitt_puls),0), ROUND(AVG(distans_km/(duration_min/60.0)),2), COUNT(*)
@@ -114,7 +134,6 @@ def get_context(veckor: int = 12) -> str:
     zon3 = zon_stats(*PULSZONER["zon3"])
     zon4 = zon_stats(*PULSZONER["zon4"])
 
-    # ── Sömn senaste 14 dagar ──────────────────────────────────
     c.execute("""
         SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min
         FROM sleep_daily
@@ -124,7 +143,6 @@ def get_context(veckor: int = 12) -> str:
     """, ((datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d"),))
     sömn = c.fetchall()
 
-    # ── Hälsodata ─────────────────────────────────────────────
     c.execute("""
         SELECT datum, vilpuls, body_battery_hogst, body_battery_lagst, stress_snitt, steg
         FROM health_daily
@@ -139,7 +157,6 @@ def get_context(veckor: int = 12) -> str:
 
     conn.close()
 
-    # ── Bygg kontextsträngen ───────────────────────────────────
     lines = []
     lines.append("=== TRÄNINGSPROFIL ===\n")
 

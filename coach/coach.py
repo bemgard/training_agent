@@ -2,6 +2,8 @@ import anthropic
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
+from scripts.context_builder import get_context, get_rag_context
+
 
 BASE_DIR = Path(__file__).parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -21,8 +23,6 @@ def chat():
     system_prompt = get_system_prompt()
     träningskontext = get_context(veckor=12)
     
-    full_system = f"{system_prompt}\n\n== ANVÄNDARENS TRÄNINGSDATA ==\n{träningskontext}"
-    
     print("🏃 Träningscoachen är redo! Skriv 'avsluta' för att stänga.\n")
     
     messages = []
@@ -37,6 +37,13 @@ def chat():
         if not user_input:
             continue
         
+        # Hämta relevant vetenskaplig kunskap baserat på frågan
+        rag_kontext = get_rag_context(user_input)
+        
+        full_system = f"{system_prompt}\n\n== ANVÄNDARENS TRÄNINGSDATA ==\n{träningskontext}"
+        if rag_kontext:
+            full_system += f"\n{rag_kontext}"
+        
         messages.append({"role": "user", "content": user_input})
         
         print("\nCoach: ", end="", flush=True)
@@ -44,7 +51,7 @@ def chat():
         response_text = ""
         with client.messages.stream(
             model="claude-haiku-4-5-20251001",
-            max_tokens=1000,
+            max_tokens=500,
             system=full_system,
             messages=messages
         ) as stream:
