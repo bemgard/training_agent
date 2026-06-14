@@ -155,6 +155,12 @@ def get_context(veckor: int = 12) -> str:
     c.execute("SELECT datum, vilpuls, body_battery_hogst, body_battery_lagst, stress_snitt FROM health_daily ORDER BY datum DESC LIMIT 1")
     idag = c.fetchone()
 
+    c.execute("""
+        SELECT datum, steg, aktiva_sek FROM health_daily
+        ORDER BY datum DESC LIMIT 2
+    """)
+    senaste_dagar = c.fetchall()
+
     conn.close()
 
     lines = []
@@ -193,6 +199,10 @@ def get_context(veckor: int = 12) -> str:
             lines.append("  ⚠️  Låg Body Battery — prioritera återhämtning")
         elif idag[3] and idag[3] > 60:
             lines.append("  ✅ Bra Body Battery — redo för hårdare träning")
+    if len(senaste_dagar) > 1:
+        igår = senaste_dagar[1]
+        if igår[1] and igår[1] > 5000:
+            lines.append(f"  📊 Gårdagens aktivitet ({igår[0]}): {igår[1]} steg | {round((igår[2] or 0)/60, 0)} aktiva min — påverkar återhämtningsbehovet")
     for row in hälsa:
         lines.append(f"  {row[0]} | vilopuls: {row[1]} | BB: {row[2]}/{row[3]} | stress: {row[4]} | steg: {row[5]}")
 
