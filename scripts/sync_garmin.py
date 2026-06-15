@@ -1,13 +1,28 @@
-import sqlite3
-import sys
 import os
+import sys
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).parent.parent
 load_dotenv(BASE_DIR / ".env")
-DB_PATH = BASE_DIR / "data" / "training.db"
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+USE_SQLITE = not DATABASE_URL
+
+if USE_SQLITE:
+    import sqlite3
+    DB_PATH = BASE_DIR / "data" / "training.db"
+
+ph = "?" if USE_SQLITE else "%s"
+insert_ignore = "INSERT OR IGNORE" if USE_SQLITE else "INSERT"
+on_conflict = "" if USE_SQLITE else " ON CONFLICT DO NOTHING"
+
+def get_conn():
+    if USE_SQLITE:
+        return sqlite3.connect(DB_PATH)
+    import psycopg2
+    return psycopg2.connect(DATABASE_URL)
 
 def sync():
     from garminconnect import Garmin
@@ -24,7 +39,7 @@ def sync():
     client.login()
     print("✅ Inloggad!\n")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
 
     sedan = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -54,17 +69,18 @@ def sync():
             tempo_sek = (duration_min * 60) / distans_km
             snitt_tempo = f"{int(tempo_sek // 60)}:{int(tempo_sek % 60):02d}/km"
 
-        result = c.execute("""
-            INSERT OR IGNORE INTO activities
+        c.execute(f"""
+            {insert_ignore} INTO activities
             (activity_id, datum, namn, typ, distans_km, duration_min, snitt_puls, max_puls, kalorier, elevation_gain, snitt_tempo, plats)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+            {on_conflict}
         """, (
             a.get("activityId"), datum, a.get("activityName", ""), typ,
             distans_km, duration_min, a.get("averageHR"), a.get("maxHR"),
             round(a.get("calories") or 0, 1), round(a.get("elevationGain") or 0, 1),
             snitt_tempo, a.get("locationName", "")
         ))
-        if result.rowcount > 0:
+        if c.rowcount > 0:
             nya_aktiviteter += 1
 
     print(f"  ✅ {nya_aktiviteter} nya aktiviteter")
@@ -88,20 +104,21 @@ def sync():
             aktiva_sek = data.get("activeSeconds")
             hog_sek = data.get("highlyActiveSeconds")
 
-            result = c.execute("""
-                INSERT OR IGNORE INTO health_daily
+            c.execute(f"""
+                {insert_ignore} INTO health_daily
                 (datum, vilpuls, min_puls, max_puls, steg, kalorier, aktiva_sek,
                  hog_intensitet_sek, stress_snitt, body_battery_hogst, body_battery_lagst, andning_snitt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                {on_conflict}
             """, (
                 dag, vilopuls,
                 data.get("minHeartRate"), data.get("maxHeartRate"),
                 steg, data.get("totalKilocalories"),
                 aktiva_sek, hog_sek, stress, bb_hogst, bb_lagst, None
             ))
-            if result.rowcount > 0:
+            if c.rowcount > 0:
                 nya_hälsa += 1
-        except Exception as e:
+        except Exception:
             continue
 
     print(f"  ✅ {nya_hälsa} nya hälsodagar")
@@ -131,14 +148,15 @@ def sync():
             latt = round((daily.get("lightSleepSeconds") or 0) / 60, 1)
             vaken = round((daily.get("awakeSleepSeconds") or 0) / 60, 1)
 
-            result = c.execute("""
-                INSERT OR IGNORE INTO sleep_daily
+            c.execute(f"""
+                {insert_ignore} INTO sleep_daily
                 (datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min, bekraftad)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                {on_conflict}
             """, (dag, sovtid_min, djup, latt, vaken, 1))
-            if result.rowcount > 0:
+            if c.rowcount > 0:
                 ny_sömn += 1
-        except Exception as e:
+        except Exception:
             continue
 
     print(f"  ✅ {ny_sömn} nya sömnätter")
@@ -152,14 +170,15 @@ def sync():
                 vo2 = entry.get("generic", {}).get("vo2MaxPreciseValue")
                 datum = entry.get("calendarDate")
                 if vo2 and datum:
-                    c.execute("""
-                        INSERT OR IGNORE INTO vo2max_history (datum, vo2max)
-                        VALUES (?, ?)
+                    c.execute(f"""
+                        {insert_ignore} INTO vo2max_history (datum, vo2max)
+                        VALUES ({ph}, {ph})
+                        {on_conflict}
                     """, (datum, vo2))
         print(f"  ✅ VO2max uppdaterad")
     except Exception as e:
         print(f"  ⚠️  VO2max misslyckades: {e}")
-        
+
     # ── 5. Användarprofil ──────────────────────────────────────────
     print("📥 Hämtar användarprofil...")
     try:
@@ -170,20 +189,17 @@ def sync():
             if vikt and langd:
                 vikt_kg = round(vikt / 1000, 1)
                 c.execute("DELETE FROM user_profile")
-                c.execute("""
+                c.execute(f"""
                     INSERT INTO user_profile (langd_cm, vikt_kg, vo2max)
-                    SELECT ?, ?, vo2max FROM user_profile LIMIT 1
+                    SELECT {ph}, {ph}, vo2max FROM user_profile LIMIT 1
                 """, (langd, vikt_kg))
                 print(f"  ✅ Profil: {langd} cm, {vikt_kg} kg")
     except Exception as e:
         print(f"  ⚠️  Profil misslyckades: {e}")
-    
 
     conn.commit()
     conn.close()
     print("\n✅ Synk klar!")
-    
-    
 
 
 if __name__ == "__main__":

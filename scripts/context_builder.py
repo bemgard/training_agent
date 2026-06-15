@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -5,9 +6,19 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "training.db"
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+USE_SQLITE = not DATABASE_URL
+ph = "?" if USE_SQLITE else "%s"
+
+def _get_conn():
+    if USE_SQLITE:
+        return sqlite3.connect(DB_PATH)
+    import psycopg2
+    return psycopg2.connect(DATABASE_URL)
+
 
 def load_pulszoner() -> dict:
-    conn = sqlite3.connect(DB_PATH)
+    conn = _get_conn()
     c = conn.cursor()
     c.execute("SELECT MAX(max_puls) FROM activities WHERE typ IN ('running', 'treadmill_running')")
     max_puls = c.fetchone()[0] or 196
@@ -72,7 +83,7 @@ def get_rag_context(fråga: str, antal: int = 3) -> str:
         return ""
 
 def get_context(veckor: int = 12) -> str:
-    conn = sqlite3.connect(DB_PATH)
+    conn = _get_conn()
     c = conn.cursor()
     sedan = (datetime.now() - timedelta(weeks=veckor)).strftime("%Y-%m-%d")
 
@@ -90,20 +101,20 @@ def get_context(veckor: int = 12) -> str:
     """)
     pr = c.fetchall()
 
-    c.execute("""
+    c.execute(f"""
         SELECT datum, typ, distans_km, duration_min, snitt_puls, snitt_tempo, plats
         FROM activities
-        WHERE datum >= ?
+        WHERE datum >= {ph}
         AND typ IN ('running', 'treadmill_running')
         AND NOT (LOWER(plats) = 'täby' AND distans_km < 10)
         ORDER BY datum DESC
     """, (sedan,))
     löppass = c.fetchall()
 
-    c.execute("""
+    c.execute(f"""
         SELECT datum, typ, distans_km, duration_min, snitt_puls, plats
         FROM activities
-        WHERE datum >= ?
+        WHERE datum >= {ph}
         ORDER BY datum DESC
     """, (sedan,))
     alla = c.fetchall()
@@ -119,11 +130,11 @@ def get_context(veckor: int = 12) -> str:
         veckor_data[vecka]["typer"].add(label)
 
     def zon_stats(low, high):
-        c.execute("""
+        c.execute(f"""
             SELECT ROUND(AVG(snitt_puls),0), ROUND(AVG(distans_km/(duration_min/60.0)),2), COUNT(*)
             FROM activities
             WHERE typ IN ('running','treadmill_running')
-            AND snitt_puls BETWEEN ? AND ?
+            AND snitt_puls BETWEEN {ph} AND {ph}
             AND distans_km > 2
             AND NOT (LOWER(plats) = 'täby' AND distans_km < 10)
         """, (low, high))
@@ -133,19 +144,19 @@ def get_context(veckor: int = 12) -> str:
     zon3 = zon_stats(*PULSZONER["zon3"])
     zon4 = zon_stats(*PULSZONER["zon4"])
 
-    c.execute("""
+    c.execute(f"""
         SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min
         FROM sleep_daily
-        WHERE datum >= ?
+        WHERE datum >= {ph}
         ORDER BY datum DESC
         LIMIT 14
     """, ((datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d"),))
     sömn = c.fetchall()
 
-    c.execute("""
+    c.execute(f"""
         SELECT datum, vilpuls, body_battery_hogst, body_battery_lagst, stress_snitt, steg
         FROM health_daily
-        WHERE datum >= ?
+        WHERE datum >= {ph}
         ORDER BY datum DESC
         LIMIT 7
     """, ((datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),))
