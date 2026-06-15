@@ -1,4 +1,3 @@
-import json
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -6,22 +5,22 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "training.db"
 
-GARMIN_WELLNESS = Path.home() / "Downloads" / "da122418-4c02-4a26-b89b-f2df8f7ef08f_1" / "DI_CONNECT" / "DI-Connect-Wellness"
 
 def load_pulszoner() -> dict:
-    zon_fil = GARMIN_WELLNESS / "96397825_heartRateZones.json"
-    with open(zon_fil) as f:
-        data = json.load(f)
-    for z in data:
-        if z.get("sport") == "RUNNING":
-            return {
-                "zon1": (z["zone1Floor"], z["zone2Floor"]),
-                "zon2": (z["zone2Floor"], z["zone3Floor"]),
-                "zon3": (z["zone3Floor"], z["zone4Floor"]),
-                "zon4": (z["zone4Floor"], z["zone5Floor"]),
-                "zon5": (z["zone5Floor"], z["maxHeartRateUsed"]),
-                "max":  z["maxHeartRateUsed"]
-            }
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT MAX(max_puls) FROM activities WHERE typ IN ('running', 'treadmill_running')")
+    max_puls = c.fetchone()[0] or 196
+    conn.close()
+
+    return {
+        "zon1": (int(max_puls * 0.50), int(max_puls * 0.60)),
+        "zon2": (int(max_puls * 0.60), int(max_puls * 0.70)),
+        "zon3": (int(max_puls * 0.70), int(max_puls * 0.80)),
+        "zon4": (int(max_puls * 0.80), int(max_puls * 0.90)),
+        "zon5": (int(max_puls * 0.90), max_puls),
+        "max":  max_puls
+    }
 
 PULSZONER = load_pulszoner()
 MAX_PULS = PULSZONER["max"]
@@ -165,6 +164,7 @@ def get_context(veckor: int = 12) -> str:
 
     lines = []
     lines.append("=== TRÄNINGSPROFIL ===\n")
+    lines.append(f"DAGENS DATUM: {datetime.now().strftime('%Y-%m-%d (%A)')}")
 
     if profil:
         lines.append(f"ANVÄNDARPROFIL: {profil[0]} cm | {profil[1]} kg | VO2max: {profil[2]}")
