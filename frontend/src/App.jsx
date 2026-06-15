@@ -11,19 +11,13 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard")
 
   useEffect(() => {
-    fetchProfile()
-      .then(data => {
-        setProfile(data)
-        setLoading(false)
-        generateSummary()
-      })
-      .catch(() => setLoading(false))
-  }, [])
-
-  async function generateSummary() {
-    const prompt = "Sammanställ min träningsprofil kort och koncist. Ge mig en snabb status på: 1) Min konditionsnivå baserat på VO2max, 2) Återhämtningsstatus idag, 3) En mening om var jag är i min träning just nu."
-    await streamChat(prompt, [], (full) => setAiSummary(full))
-  }
+  fetchProfile()
+    .then(data => {
+      setProfile(data)
+      setLoading(false)
+    })
+    .catch(() => setLoading(false))
+}, [])
 
   if (loading) return (
     <div style={{
@@ -46,7 +40,7 @@ export default function App() {
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', sans-serif",
       color: "#e2e8f0"
     }}>
-      <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Header activeTab={activeTab} setActiveTab={setActiveTab} profile={profile} />
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px" }}>
         {activeTab === "dashboard" && (
           <Dashboard

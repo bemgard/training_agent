@@ -62,6 +62,15 @@ def get_profile(db: sqlite3.Connection = Depends(get_db)):
     # Senaste VO2max
     c.execute("SELECT vo2max, datum FROM vo2max_history ORDER BY datum DESC LIMIT 1")
     vo2 = c.fetchone()
+    
+    # Sömndata senaste dagen
+    c.execute("""
+        SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min
+        FROM sleep_daily
+        ORDER BY datum DESC
+        LIMIT 1
+    """)
+    sömn = c.fetchone()
 
     # Veckosammanfattning senaste 8 veckor
     c.execute("""
@@ -83,4 +92,5 @@ def get_profile(db: sqlite3.Connection = Depends(get_db)):
     "veckosammanfattning": [dict(v) for v in veckor],
     "aktiviteter": result,
     "veckans_aktiviteter": [dict(v) for v in veckans],
+    "sömn": dict(sömn) if sömn else {}
 }

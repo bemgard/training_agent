@@ -12,4 +12,6 @@ def sync():
         capture_output=True,
         text=True
     )
-    return {"output": result.stdout, "error": result.stderr}
+    if result.returncode != 0:
+        return {"ok": False, "error": result.stderr}
+    return {"ok": True, "output": result.stdout}

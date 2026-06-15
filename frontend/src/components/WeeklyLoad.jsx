@@ -2,13 +2,28 @@ import { TrendingUp } from "lucide-react"
 
 const DAGAR = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"]
 
+function getVeckansDatum() {
+  const idag = new Date()
+  const dagIVeckan = idag.getDay() === 0 ? 6 : idag.getDay() - 1 // 0=mån, 6=sön
+  const måndag = new Date(idag)
+  måndag.setDate(idag.getDate() - dagIVeckan)
+  måndag.setHours(0, 0, 0, 0)
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(måndag)
+    d.setDate(måndag.getDate() + i)
+    return d
+  })
+}
+
 export default function WeeklyLoad({ aktiviteter }) {
+  const veckansDatum = getVeckansDatum()
+
   const dagData = DAGAR.map((dag, i) => {
-    const jsDay = i === 6 ? 0 : i + 1 // JS: 0=sön, 1=mån...
-    const pass = aktiviteter?.filter(a => {
-      const d = new Date(a.datum + "T12:00:00") // undvik timezone-problem
-      return d.getDay() === jsDay
-    }) || []
+    const datum = veckansDatum[i]
+    const datumStr = datum.toISOString().split("T")[0]
+
+    const pass = aktiviteter?.filter(a => a.datum === datumStr) || []
     const km = pass.reduce((sum, a) => sum + (a.distans_km || 0), 0)
     return { dag, km: Math.round(km * 10) / 10, pass: pass.length }
   })

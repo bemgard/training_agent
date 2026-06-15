@@ -1,12 +1,34 @@
-import { Activity, Heart, Zap, TrendingUp } from "lucide-react"
+import { Activity, Heart, Zap, TrendingUp, Moon } from "lucide-react"
 import KPICard from "./KPICard"
-import BodyBatteryChart from "./BodyBatteryChart"
+import SenasteAktivitet from "./SenasteAktivitet"
 import PRCard from "./PRCard"
 import WeeklyLoad from "./WeeklyLoad"
 import ActivityLog from "./ActivityLog"
 
+function getTrainingStatus(hälsa, veckor) {
+  const bb = hälsa[0]?.body_battery_hogst
+  const stress = hälsa[0]?.stress_snitt
+  const kmDennVecka = veckor[0]?.total_km || 0
+  const kmFörraVeckan = veckor[1]?.total_km || 0
+  const belastningDelta = kmFörraVeckan ? ((kmDennVecka - kmFörraVeckan) / kmFörraVeckan) * 100 : 0
+
+  if (bb > 70 && stress < 40) return { label: "Produktiv", color: "#f97316", delta: belastningDelta }
+  if (bb > 50) return { label: "Balanserad", color: "#06b6d4", delta: belastningDelta }
+  if (bb < 30) return { label: "Vila", color: "#ef4444", delta: belastningDelta }
+  return { label: "Återhämtning", color: "#a78bfa", delta: belastningDelta }
+}
+
 export default function Dashboard({ profile, aiSummary, onOpenChat }) {
   const hälsa = profile?.hälsodata || []
+  const veckor = profile?.veckosammanfattning || []
+  const hälsaMedData = hälsa.filter(d => d.body_battery_hogst)
+  const status = getTrainingStatus(hälsaMedData, veckor)
+
+  const bbSnitt = Math.round(
+    hälsaMedData.reduce((a, b) => a + (b.body_battery_hogst || 0), 0) /
+    (hälsaMedData.length || 1)
+  )
+
   const vilopulsSnitt = Math.round(
     hälsa.filter(d => d.vilpuls).reduce((a, b) => a + b.vilpuls, 0) /
     (hälsa.filter(d => d.vilpuls).length || 1)
@@ -16,9 +38,27 @@ export default function Dashboard({ profile, aiSummary, onOpenChat }) {
   const bbData = [...hälsa].reverse().map(d => d.body_battery_hogst)
   const stegData = [...hälsa].reverse().map(d => d.steg)
 
+  const sömnText = profile?.sömn?.sovtid_min
+    ? `${Math.floor(profile.sömn.sovtid_min / 60)}h ${Math.round(profile.sömn.sovtid_min % 60)}m`
+    : "—"
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 16 }}>
+        <KPICard
+          icon={Activity}
+          label="Träningsstatus"
+          value={status.label}
+          sub={`Belastning ${status.delta >= 0 ? "↑" : "↓"} ${Math.abs(Math.round(status.delta))}%`}
+          color={status.color}
+        />
+        <KPICard
+          icon={Moon}
+          label="Sömn"
+          value={sömnText}
+          sub={profile?.sömn?.djup_sov_min ? `Djup sömn: ${Math.round(profile.sömn.djup_sov_min)}min` : "Ingen data"}
+          color="#a78bfa"
+        />
         <KPICard
           icon={TrendingUp}
           label="VO2max"
@@ -39,10 +79,10 @@ export default function Dashboard({ profile, aiSummary, onOpenChat }) {
         <KPICard
           icon={Zap}
           label="Body Battery"
-          value={hälsa[0]?.body_battery_hogst}
+          value={hälsaMedData[0]?.body_battery_hogst}
           unit="/ 100"
-          sub="Idag"
-          color={hälsa[0]?.body_battery_hogst > 60 ? "#6ee7b7" : "#fb923c"}
+          sub={`Snitt 7 dagar: ${bbSnitt}`}
+          color={hälsaMedData[0]?.body_battery_hogst > 60 ? "#6ee7b7" : "#fb923c"}
           sparkline={bbData}
         />
         <KPICard
@@ -57,8 +97,8 @@ export default function Dashboard({ profile, aiSummary, onOpenChat }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <BodyBatteryChart data={hälsa} />
-        <PRCard records={profile?.personliga_rekord || []} />
+        <SenasteAktivitet aktiviteter={profile?.aktiviteter} />
+        <PRCard records={profile?.personliga_rekord || []} profile={profile} />
       </div>
 
       <WeeklyLoad aktiviteter={profile?.aktiviteter} />

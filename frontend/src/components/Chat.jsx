@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react"
 import { Send } from "lucide-react"
 import { streamChat } from "../api"
 
+
 function ChatMessage({ role, content }) {
   return (
     <div style={{
