@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import profile, chat, sync
+from api.routes import profile, chat, sync, auth as auth_routes
 
 app = FastAPI(title="Training Agent API")
 
@@ -15,6 +15,7 @@ app.add_middleware(
 app.include_router(profile.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(sync.router, prefix="/api")
+app.include_router(auth_routes.router, prefix="/api")
 
 @app.get("/")
 def root():

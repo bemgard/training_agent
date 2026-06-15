@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException
 from datetime import datetime, timedelta
 from collections import defaultdict
 from api.database import get_db, USE_SQLITE
+from api.routes.auth import verifiera_token
 
 router = APIRouter()
-
 ph = "?" if USE_SQLITE else "%s"
 
 def classify_activity(typ, plats, distans_km):
@@ -13,17 +13,24 @@ def classify_activity(typ, plats, distans_km):
         return "football"
     return typ
 
-@router.get("/profile")
-def get_profile(db=Depends(get_db)):
-    c = db.cursor()
+def get_current_user(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Inte inloggad")
+    token = authorization.split(" ")[1]
+    return verifiera_token(token)
 
-    c.execute("""
+@router.get("/profile")
+def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
+    c = db.cursor()
+    user_id = user["user_id"]
+
+    c.execute(f"""
         SELECT datum, namn, typ, distans_km, duration_min, snitt_puls, snitt_tempo, plats
         FROM activities
-        WHERE typ NOT IN ('golf')
+        WHERE typ NOT IN ('golf') AND user_id = {ph}
         ORDER BY datum DESC
         LIMIT 10
-    """)
+    """, (user_id,))
     aktiviteter = c.fetchall()
     result = []
     for a in aktiviteter:
@@ -35,45 +42,47 @@ def get_profile(db=Depends(get_db)):
     c.execute(f"""
         SELECT datum, typ, distans_km, duration_min, snitt_puls, plats
         FROM activities
-        WHERE datum >= {ph}
+        WHERE datum >= {ph} AND user_id = {ph}
         ORDER BY datum ASC
-    """, (sju_dagar,))
+    """, (sju_dagar, user_id))
     veckans = c.fetchall()
 
-    c.execute("SELECT langd_cm, vikt_kg, vo2max FROM user_profile LIMIT 1")
+    c.execute(f"SELECT langd_cm, vikt_kg, vo2max FROM user_profile WHERE id = {ph} LIMIT 1", (user_id,))
     profil = c.fetchone()
+    if not profil:
+        c.execute("SELECT langd_cm, vikt_kg, vo2max FROM user_profile LIMIT 1")
+        profil = c.fetchone()
 
-    c.execute("""
+    c.execute(f"""
         SELECT typ, formaterat, datum FROM personal_records
-        WHERE current = 1
+        WHERE current = 1 AND user_id = {ph}
         AND typ IN ('Best 1km Run', 'Best Half Marathon', 'Best Full Marathon', 'Farthest Run')
         ORDER BY datum
-    """)
+    """, (user_id,))
     pr = c.fetchall()
 
-    c.execute("""
+    c.execute(f"""
         SELECT datum, vilpuls, body_battery_hogst, body_battery_lagst, stress_snitt, steg
-        FROM health_daily ORDER BY datum DESC LIMIT 7
-    """)
+        FROM health_daily WHERE user_id = {ph}
+        ORDER BY datum DESC LIMIT 7
+    """, (user_id,))
     hälsa = c.fetchall()
 
-    c.execute("SELECT vo2max, datum FROM vo2max_history ORDER BY datum DESC LIMIT 1")
+    c.execute(f"SELECT vo2max, datum FROM vo2max_history WHERE user_id = {ph} ORDER BY datum DESC LIMIT 1", (user_id,))
     vo2 = c.fetchone()
 
-    c.execute("""
+    c.execute(f"""
         SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min
-        FROM sleep_daily
-        ORDER BY datum DESC
-        LIMIT 1
-    """)
+        FROM sleep_daily WHERE user_id = {ph}
+        ORDER BY datum DESC LIMIT 1
+    """, (user_id,))
     sömn = c.fetchone()
 
     atta_veckor = (datetime.now() - timedelta(weeks=8)).strftime("%Y-%m-%d")
     c.execute(f"""
-        SELECT datum, distans_km
-        FROM activities
-        WHERE datum >= {ph}
-    """, (atta_veckor,))
+        SELECT datum, distans_km FROM activities
+        WHERE datum >= {ph} AND user_id = {ph}
+    """, (atta_veckor, user_id))
     act_rows = c.fetchall()
 
     vecka_map = defaultdict(lambda: {"antal_pass": 0, "total_km": 0.0})

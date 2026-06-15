@@ -9,7 +9,7 @@ const colors = {
   text: "#e2e8f0",
 }
 
-export default function Header({ activeTab, setActiveTab, profile }) {
+export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
   const [synkar, setSynkar] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null)
 
@@ -28,20 +28,20 @@ export default function Header({ activeTab, setActiveTab, profile }) {
     setSynkar(true)
     setSyncStatus(null)
     try {
-        const data = await syncGarmin()
-        if (data.ok) {
+      const data = await syncGarmin()
+      if (data.ok) {
         setSyncStatus("ok")
         setTimeout(() => window.location.reload(), 1500)
-        } else {
+      } else {
         setSyncStatus("fel")
         console.error(data.error)
-        }
+      }
     } catch {
-        setSyncStatus("fel")
+      setSyncStatus("fel")
     } finally {
-        setSynkar(false)
+      setSynkar(false)
     }
-    }
+  }
 
   return (
     <div style={{
@@ -86,6 +86,18 @@ export default function Header({ activeTab, setActiveTab, profile }) {
         }}>
           <span style={{ display: "inline-block", animation: synkar ? "spin 1s linear infinite" : "none" }}>↻</span>
           {synkar ? "Synkar..." : syncStatus === "ok" ? "Klar!" : syncStatus === "fel" ? "Misslyckades" : "Synka"}
+        </button>
+
+        <button onClick={onLogout} style={{
+          background: "transparent",
+          border: `1px solid ${colors.border}`,
+          color: colors.muted,
+          padding: "8px 14px",
+          borderRadius: 8,
+          cursor: "pointer",
+          fontSize: 12,
+        }}>
+          Logga ut
         </button>
 
         <div style={{ display: "flex", gap: 8 }}>

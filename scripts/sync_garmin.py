@@ -27,11 +27,17 @@ def get_conn():
 def sync():
     from garminconnect import Garmin
 
+    user_id = os.getenv("SYNC_USER_ID")
+    if not user_id:
+        print("❌ SYNC_USER_ID saknas")
+        return
+    user_id = int(user_id)
+
     email = os.getenv("GARMIN_EMAIL")
     password = os.getenv("GARMIN_PASSWORD")
 
     if not email or not password:
-        print("❌ GARMIN_EMAIL och GARMIN_PASSWORD saknas i .env")
+        print("❌ GARMIN_EMAIL och GARMIN_PASSWORD saknas")
         return
 
     print("🔄 Loggar in på Garmin Connect...")
@@ -71,14 +77,15 @@ def sync():
 
         c.execute(f"""
             {insert_ignore} INTO activities
-            (activity_id, datum, namn, typ, distans_km, duration_min, snitt_puls, max_puls, kalorier, elevation_gain, snitt_tempo, plats)
-            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+            (activity_id, datum, namn, typ, distans_km, duration_min, snitt_puls, max_puls,
+             kalorier, elevation_gain, snitt_tempo, plats, user_id)
+            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
             {on_conflict}
         """, (
             a.get("activityId"), datum, a.get("activityName", ""), typ,
             distans_km, duration_min, a.get("averageHR"), a.get("maxHR"),
             round(a.get("calories") or 0, 1), round(a.get("elevationGain") or 0, 1),
-            snitt_tempo, a.get("locationName", "")
+            snitt_tempo, a.get("locationName", ""), user_id
         ))
         if c.rowcount > 0:
             nya_aktiviteter += 1
@@ -107,14 +114,15 @@ def sync():
             c.execute(f"""
                 {insert_ignore} INTO health_daily
                 (datum, vilpuls, min_puls, max_puls, steg, kalorier, aktiva_sek,
-                 hog_intensitet_sek, stress_snitt, body_battery_hogst, body_battery_lagst, andning_snitt)
-                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                 hog_intensitet_sek, stress_snitt, body_battery_hogst, body_battery_lagst,
+                 andning_snitt, user_id)
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                 {on_conflict}
             """, (
                 dag, vilopuls,
                 data.get("minHeartRate"), data.get("maxHeartRate"),
                 steg, data.get("totalKilocalories"),
-                aktiva_sek, hog_sek, stress, bb_hogst, bb_lagst, None
+                aktiva_sek, hog_sek, stress, bb_hogst, bb_lagst, None, user_id
             ))
             if c.rowcount > 0:
                 nya_hälsa += 1
@@ -150,10 +158,10 @@ def sync():
 
             c.execute(f"""
                 {insert_ignore} INTO sleep_daily
-                (datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min, bekraftad)
-                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                (datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min, bekraftad, user_id)
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                 {on_conflict}
-            """, (dag, sovtid_min, djup, latt, vaken, 1))
+            """, (dag, sovtid_min, djup, latt, vaken, 1, user_id))
             if c.rowcount > 0:
                 ny_sömn += 1
         except Exception:
@@ -171,15 +179,15 @@ def sync():
                 datum = entry.get("calendarDate")
                 if vo2 and datum:
                     c.execute(f"""
-                        {insert_ignore} INTO vo2max_history (datum, vo2max)
-                        VALUES ({ph}, {ph})
+                        {insert_ignore} INTO vo2max_history (datum, vo2max, user_id)
+                        VALUES ({ph}, {ph}, {ph})
                         {on_conflict}
-                    """, (datum, vo2))
+                    """, (datum, vo2, user_id))
         print(f"  ✅ VO2max uppdaterad")
     except Exception as e:
         print(f"  ⚠️  VO2max misslyckades: {e}")
 
-    # ── 5. Användarprofil ──────────────────────────────────────────
+    # ── 5. Användarprofil ──────────────────────────────────────
     print("📥 Hämtar användarprofil...")
     try:
         profil = client.get_user_profile()
@@ -188,11 +196,11 @@ def sync():
             langd = profil.get("height")
             if vikt and langd:
                 vikt_kg = round(vikt / 1000, 1)
-                c.execute("DELETE FROM user_profile")
+                c.execute(f"DELETE FROM user_profile WHERE id = {ph}", (user_id,))
                 c.execute(f"""
-                    INSERT INTO user_profile (langd_cm, vikt_kg, vo2max)
-                    SELECT {ph}, {ph}, vo2max FROM user_profile LIMIT 1
-                """, (langd, vikt_kg))
+                    INSERT INTO user_profile (id, langd_cm, vikt_kg, vo2max)
+                    VALUES ({ph}, {ph}, {ph}, NULL)
+                """, (user_id, langd, vikt_kg))
                 print(f"  ✅ Profil: {langd} cm, {vikt_kg} kg")
     except Exception as e:
         print(f"  ⚠️  Profil misslyckades: {e}")

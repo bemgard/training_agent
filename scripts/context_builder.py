@@ -16,12 +16,14 @@ def _get_conn():
     import psycopg2
     return psycopg2.connect(DATABASE_URL)
 
-
-def load_pulszoner() -> dict:
+def load_pulszoner(user_id: int = None) -> dict:
     conn = _get_conn()
     c = conn.cursor()
-    c.execute("SELECT MAX(max_puls) FROM activities WHERE typ IN ('running', 'treadmill_running')")
-    max_puls = c.fetchone()[0] or 196
+    if user_id:
+        c.execute(f"SELECT MAX(max_puls) FROM activities WHERE typ IN ('running', 'treadmill_running') AND user_id = {ph}", (user_id,))
+    else:
+        c.execute("SELECT MAX(max_puls) FROM activities WHERE typ IN ('running', 'treadmill_running')")
+    max_puls = c.fetchone()[0] or 190
     conn.close()
 
     return {
@@ -79,44 +81,49 @@ def get_rag_context(fråga: str, antal: int = 3) -> str:
             lines.append("")
 
         return "\n".join(lines)
-    except Exception as e:
+    except Exception:
         return ""
 
-def get_context(veckor: int = 12) -> str:
+def get_context(veckor: int = 12, user_id: int = None) -> str:
     conn = _get_conn()
     c = conn.cursor()
     sedan = (datetime.now() - timedelta(weeks=veckor)).strftime("%Y-%m-%d")
 
-    c.execute("SELECT langd_cm, vikt_kg, vo2max FROM user_profile LIMIT 1")
+    uid_filter = f"AND user_id = {ph}" if user_id else ""
+    uid_val = (user_id,) if user_id else ()
+
+    pulszoner = load_pulszoner(user_id)
+
+    c.execute(f"SELECT langd_cm, vikt_kg, vo2max FROM user_profile LIMIT 1")
     profil = c.fetchone()
 
-    c.execute("SELECT vo2max, datum FROM vo2max_history ORDER BY datum DESC LIMIT 1")
+    c.execute(f"SELECT vo2max, datum FROM vo2max_history {('WHERE user_id = ' + ph) if user_id else ''} ORDER BY datum DESC LIMIT 1", uid_val)
     vo2 = c.fetchone()
 
-    c.execute("""
+    c.execute(f"""
         SELECT typ, formaterat, datum FROM personal_records
-        WHERE current = 1
+        WHERE current = 1 {uid_filter}
         AND typ IN ('Best 1km Run', 'Best Half Marathon', 'Best Full Marathon', 'Farthest Run')
         ORDER BY datum
-    """)
+    """, uid_val)
     pr = c.fetchall()
 
     c.execute(f"""
         SELECT datum, typ, distans_km, duration_min, snitt_puls, snitt_tempo, plats
         FROM activities
-        WHERE datum >= {ph}
+        WHERE datum >= {ph} {uid_filter}
         AND typ IN ('running', 'treadmill_running')
         AND NOT (LOWER(plats) = 'täby' AND distans_km < 10)
         ORDER BY datum DESC
-    """, (sedan,))
+    """, (sedan,) + uid_val)
     löppass = c.fetchall()
 
     c.execute(f"""
         SELECT datum, typ, distans_km, duration_min, snitt_puls, plats
         FROM activities
-        WHERE datum >= {ph}
+        WHERE datum >= {ph} {uid_filter}
         ORDER BY datum DESC
-    """, (sedan,))
+    """, (sedan,) + uid_val)
     alla = c.fetchall()
 
     from collections import defaultdict
@@ -131,44 +138,48 @@ def get_context(veckor: int = 12) -> str:
 
     def zon_stats(low, high):
         c.execute(f"""
-            SELECT ROUND(AVG(snitt_puls),0), ROUND(AVG(distans_km/(duration_min/60.0)),2), COUNT(*)
+            SELECT ROUND(AVG(snitt_puls)::numeric, 0), ROUND(AVG(distans_km/(duration_min/60.0))::numeric, 2), COUNT(*)
             FROM activities
             WHERE typ IN ('running','treadmill_running')
             AND snitt_puls BETWEEN {ph} AND {ph}
             AND distans_km > 2
             AND NOT (LOWER(plats) = 'täby' AND distans_km < 10)
-        """, (low, high))
+            {uid_filter}
+        """, (low, high) + uid_val)
         return c.fetchone()
-
-    zon2 = zon_stats(*PULSZONER["zon2"])
-    zon3 = zon_stats(*PULSZONER["zon3"])
-    zon4 = zon_stats(*PULSZONER["zon4"])
+    
+    zon2 = zon_stats(*pulszoner["zon2"])
+    zon3 = zon_stats(*pulszoner["zon3"])
+    zon4 = zon_stats(*pulszoner["zon4"])
 
     c.execute(f"""
         SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min
         FROM sleep_daily
-        WHERE datum >= {ph}
-        ORDER BY datum DESC
-        LIMIT 14
-    """, ((datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d"),))
+        WHERE datum >= {ph} {uid_filter}
+        ORDER BY datum DESC LIMIT 14
+    """, ((datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d"),) + uid_val)
     sömn = c.fetchall()
 
     c.execute(f"""
         SELECT datum, vilpuls, body_battery_hogst, body_battery_lagst, stress_snitt, steg
         FROM health_daily
-        WHERE datum >= {ph}
-        ORDER BY datum DESC
-        LIMIT 7
-    """, ((datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),))
+        WHERE datum >= {ph} {uid_filter}
+        ORDER BY datum DESC LIMIT 7
+    """, ((datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),) + uid_val)
     hälsa = c.fetchall()
 
-    c.execute("SELECT datum, vilpuls, body_battery_hogst, body_battery_lagst, stress_snitt FROM health_daily ORDER BY datum DESC LIMIT 1")
+    c.execute(f"""
+        SELECT datum, vilpuls, body_battery_hogst, body_battery_lagst, stress_snitt
+        FROM health_daily {('WHERE user_id = ' + ph) if user_id else ''}
+        ORDER BY datum DESC LIMIT 1
+    """, uid_val)
     idag = c.fetchone()
 
-    c.execute("""
+    c.execute(f"""
         SELECT datum, steg, aktiva_sek FROM health_daily
+        {('WHERE user_id = ' + ph) if user_id else ''}
         ORDER BY datum DESC LIMIT 2
-    """)
+    """, uid_val)
     senaste_dagar = c.fetchall()
 
     conn.close()
@@ -186,11 +197,11 @@ def get_context(veckor: int = 12) -> str:
     for row in pr:
         lines.append(f"  {row[0]}: {row[1]} ({row[2]})")
 
-    lines.append(f"\nPULSZONER (löpning, maxpuls {MAX_PULS}):")
-    lines.append(f"  Zon 1: {PULSZONER['zon1'][0]}-{PULSZONER['zon1'][1]} bpm")
-    lines.append(f"  Zon 2: {PULSZONER['zon2'][0]}-{PULSZONER['zon2'][1]} bpm | faktiskt tempo: {kmh_till_tempo(zon2[1])} | {zon2[2]} pass")
-    lines.append(f"  Zon 3: {PULSZONER['zon3'][0]}-{PULSZONER['zon3'][1]} bpm | faktiskt tempo: {kmh_till_tempo(zon3[1])} | {zon3[2]} pass")
-    lines.append(f"  Zon 4: {PULSZONER['zon4'][0]}-{PULSZONER['zon4'][1]} bpm | faktiskt tempo: {kmh_till_tempo(zon4[1])} | {zon4[2]} pass")
+    lines.append(f"\nPULSZONER (löpning, maxpuls {pulszoner['max']}):")
+    lines.append(f"  Zon 1: {pulszoner['zon1'][0]}-{pulszoner['zon1'][1]} bpm")
+    lines.append(f"  Zon 2: {pulszoner['zon2'][0]}-{pulszoner['zon2'][1]} bpm | faktiskt tempo: {kmh_till_tempo(zon2[1])} | {zon2[2]} pass")
+    lines.append(f"  Zon 3: {pulszoner['zon3'][0]}-{pulszoner['zon3'][1]} bpm | faktiskt tempo: {kmh_till_tempo(zon3[1])} | {zon3[2]} pass")
+    lines.append(f"  Zon 4: {pulszoner['zon4'][0]}-{pulszoner['zon4'][1]} bpm | faktiskt tempo: {kmh_till_tempo(zon4[1])} | {zon4[2]} pass")
 
     lines.append(f"\nVECKOSAMMANFATTNING (senaste {veckor} veckor):")
     for vecka in sorted(veckor_data.keys(), reverse=True):
@@ -213,11 +224,11 @@ def get_context(veckor: int = 12) -> str:
     if len(senaste_dagar) > 1:
         igår = senaste_dagar[1]
         if igår[1] and igår[1] > 5000:
-            lines.append(f"  📊 Gårdagens aktivitet ({igår[0]}): {igår[1]} steg | {round((igår[2] or 0)/60, 0)} aktiva min — påverkar återhämtningsbehovet")
+            lines.append(f"  📊 Gårdagens aktivitet ({igår[0]}): {igår[1]} steg | {round((igår[2] or 0)/60, 0)} aktiva min")
     for row in hälsa:
         lines.append(f"  {row[0]} | vilopuls: {row[1]} | BB: {row[2]}/{row[3]} | stress: {row[4]} | steg: {row[5]}")
 
-    lines.append(f"\nSÖMN SENASTE 14 DAGAR (bekräftade nätter):")
+    lines.append(f"\nSÖMN SENASTE 14 DAGAR:")
     if sömn:
         for row in sömn:
             lines.append(f"  {row[0]} | total: {row[1]} min | djup: {row[2]} min | lätt: {row[3]} min | vaken: {row[4]} min")

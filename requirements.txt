@@ -6,3 +6,6 @@ sentence-transformers
 fastapi
 uvicorn
 psycopg2-binary
+bcrypt
+cryptography
+pyjwt

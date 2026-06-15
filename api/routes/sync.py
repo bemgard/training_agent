@@ -1,16 +1,42 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Header, HTTPException
 import subprocess
 import sys
 from pathlib import Path
+from api.database import get_db
+from api.routes.auth import verifiera_token
+from api.auth import dekryptera
 
 router = APIRouter()
 
+def get_current_user(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Inte inloggad")
+    token = authorization.split(" ")[1]
+    return verifiera_token(token)
+
 @router.post("/sync")
-def sync():
+def sync(db=Depends(get_db), user=Depends(get_current_user)):
+    c = db.cursor()
+    ph = "%s"
+    c.execute(f"SELECT id, garmin_email, garmin_password FROM users WHERE id = {ph}", (user["user_id"],))
+    row = c.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Användare hittades inte")
+
+    user_id = row["id"]
+    garmin_email = dekryptera(row["garmin_email"])
+    garmin_password = dekryptera(row["garmin_password"])
+
     result = subprocess.run(
         [sys.executable, str(Path(__file__).parent.parent.parent / "scripts" / "sync_garmin.py")],
         capture_output=True,
-        text=True
+        text=True,
+        env={
+            **__import__("os").environ,
+            "GARMIN_EMAIL": garmin_email,
+            "GARMIN_PASSWORD": garmin_password,
+            "SYNC_USER_ID": str(user_id),
+        }
     )
     if result.returncode != 0:
         return {"ok": False, "error": result.stderr}

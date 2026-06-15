@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -11,6 +11,7 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from scripts.context_builder import get_context, get_rag_context
+from api.routes.auth import verifiera_token
 
 router = APIRouter()
 
@@ -23,13 +24,22 @@ def get_system_prompt() -> str:
     with open(prompt_path) as f:
         return f.read()
 
+def get_current_user(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Inte inloggad")
+    token = authorization.split(" ")[1]
+    return verifiera_token(token)
+
 @router.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, authorization: str = Header(None)):
+    user = get_current_user(authorization)
+    user_id = user["user_id"]
+
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    
-    träningskontext = get_context(veckor=12)
+
+    träningskontext = get_context(veckor=12, user_id=user_id)
     rag_kontext = get_rag_context(request.message)
-    
+
     system = get_system_prompt()
     system += f"\n\n== ANVÄNDARENS TRÄNINGSDATA ==\n{träningskontext}"
     if rag_kontext:
