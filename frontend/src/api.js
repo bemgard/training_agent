@@ -26,3 +26,8 @@ export async function streamChat(message, history, onChunk) {
 
   return full
 }
+
+export async function syncGarmin() {
+  const res = await fetch(`${API}/sync`, { method: "POST" })
+  return res.json()
+}

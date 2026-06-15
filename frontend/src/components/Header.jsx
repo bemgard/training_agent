@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { syncGarmin } from "../api"
 
 const colors = {
   border: "#2a2a3a",
@@ -27,21 +28,20 @@ export default function Header({ activeTab, setActiveTab, profile }) {
     setSynkar(true)
     setSyncStatus(null)
     try {
-      const res = await fetch("/api/sync", { method: "POST" })
-      const data = await res.json()
-      if (data.ok) {
+        const data = await syncGarmin()
+        if (data.ok) {
         setSyncStatus("ok")
         setTimeout(() => window.location.reload(), 1500)
-      } else {
+        } else {
         setSyncStatus("fel")
         console.error(data.error)
-      }
+        }
     } catch {
-      setSyncStatus("fel")
+        setSyncStatus("fel")
     } finally {
-      setSynkar(false)
+        setSynkar(false)
     }
-  }
+    }
 
   return (
     <div style={{
