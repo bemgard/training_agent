@@ -8,6 +8,8 @@ from api.auth import hasha_lösenord, verifiera_lösenord, kryptera
 
 router = APIRouter()
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret")
+USE_SQLITE = not os.environ.get("DATABASE_URL")
+ph = "?" if USE_SQLITE else "%s"
 
 class RegisterRequest(BaseModel):
     email: str
@@ -42,22 +44,35 @@ def register(req: RegisterRequest, db=Depends(get_db)):
         lösenord_hash = hasha_lösenord(req.lösenord)
         garmin_email_krypterad = kryptera(req.garmin_email)
         garmin_password_krypterad = kryptera(req.garmin_password)
-        c.execute("""
-            INSERT INTO users (email, lösenord_hash, garmin_email, garmin_password)
-            VALUES (%s, %s, %s, %s) RETURNING id
-        """, (req.email, lösenord_hash, garmin_email_krypterad, garmin_password_krypterad))
-        user_id = c.fetchone()["id"]
-        db.commit()
+        if USE_SQLITE:
+            c.execute(f"""
+                INSERT INTO users (email, lösenord_hash, garmin_email, garmin_password)
+                VALUES ({ph}, {ph}, {ph}, {ph})
+            """, (req.email, lösenord_hash, garmin_email_krypterad, garmin_password_krypterad))
+            user_id = c.lastrowid
+            db.commit()
+        else:
+            c.execute(f"""
+                INSERT INTO users (email, lösenord_hash, garmin_email, garmin_password)
+                VALUES ({ph}, {ph}, {ph}, {ph}) RETURNING id
+            """, (req.email, lösenord_hash, garmin_email_krypterad, garmin_password_krypterad))
+            user_id = c.fetchone()["id"]
+            db.commit()
         token = skapa_token(user_id, req.email)
         return {"token": token, "email": req.email}
     except Exception as e:
         raise HTTPException(status_code=400, detail="Email redan registrerad")
-
+    
 @router.post("/auth/login")
 def login(req: LoginRequest, db=Depends(get_db)):
     c = db.cursor()
-    c.execute("SELECT * FROM users WHERE email = %s", (req.email,))
+    c.execute(f"SELECT * FROM users WHERE email = {ph}", (req.email,))
     user = c.fetchone()
+    print("LOGIN DEBUG: email =", repr(req.email))
+    print("LOGIN DEBUG: user hittad =", user is not None)
+    if user:
+        print("LOGIN DEBUG: hash i db =", user["lösenord_hash"][:20], "...")
+        print("LOGIN DEBUG: lösenord matchar =", verifiera_lösenord(req.lösenord, user["lösenord_hash"]))
     if not user or not verifiera_lösenord(req.lösenord, user["lösenord_hash"]):
         raise HTTPException(status_code=401, detail="Fel email eller lösenord")
     token = skapa_token(user["id"], user["email"])

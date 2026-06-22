@@ -13,7 +13,7 @@ const colors = {
 }
 
 export default function Login({ onLogin }) {
-    const [mode, setMode] = useState("login") // "login" | "register"
+    const [mode, setMode] = useState("login")
     const [email, setEmail] = useState("")
     const [lösenord, setLösenord] = useState("")
     const [garminEmail, setGarminEmail] = useState("")
@@ -21,8 +21,15 @@ export default function Login({ onLogin }) {
     const [fel, setFel] = useState("")
     const [laddar, setLaddar] = useState(false)
 
-
     async function submit() {
+        if (!email || !lösenord) {
+            setFel("Fyll i email och lösenord")
+            return
+        }
+        if (mode === "register" && (!garminEmail || !garminPassword)) {
+            setFel("Fyll i dina Garmin-uppgifter")
+            return
+        }
         setFel("")
         setLaddar(true)
         try {
@@ -59,9 +66,9 @@ export default function Login({ onLogin }) {
                 borderRadius: 16,
                 padding: "40px 48px",
                 width: "100%",
-                maxWidth: 400,
+                maxWidth: 420,
             }}>
-                <div style={{ marginBottom: 32 }}>
+                <div style={{ marginBottom: 28 }}>
                     <div style={{ fontSize: 11, color: colors.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>
                         Training Agent
                     </div>
@@ -71,16 +78,21 @@ export default function Login({ onLogin }) {
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {mode === "register" && (
+                        <div style={{ fontSize: 12, fontWeight: 600, color: colors.accent, letterSpacing: "0.05em" }}>
+                            STEG 1 · DITT KONTO HÄR I APPEN
+                        </div>
+                    )}
                     <input
                         type="email"
-                        placeholder="Email"
+                        placeholder="Din email (för inloggning)"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         style={inputStyle(colors)}
                     />
                     <input
                         type="password"
-                        placeholder="Lösenord"
+                        placeholder="Ditt lösenord (för inloggning)"
                         value={lösenord}
                         onChange={e => setLösenord(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && submit()}
@@ -88,13 +100,23 @@ export default function Login({ onLogin }) {
                     />
 
                     {mode === "register" && (
-                        <>
-                            <div style={{ height: 1, background: colors.border, margin: "8px 0" }} />
-                            <div style={{ fontSize: 13, fontWeight: 500, color: colors.text }}>
-                                Anslut Garmin
-                            </div>
-                            <div style={{ fontSize: 12, color: colors.muted, marginTop: -4 }}>
-                                Dina uppgifter krypteras och används bara för att hämta din träningsdata.
+                        <div style={{
+                            background: colors.accentDim,
+                            border: `1px solid ${colors.accent}40`,
+                            borderRadius: 10,
+                            padding: "14px 16px",
+                            marginTop: 8,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 12,
+                        }}>
+                            <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: colors.accent, letterSpacing: "0.05em" }}>
+                                    STEG 2 · DITT GARMIN-KONTO
+                                </div>
+                                <div style={{ fontSize: 12, color: colors.muted, marginTop: 4, lineHeight: 1.5 }}>
+                                    Samma uppgifter du loggar in med i Garmin Connect-appen. Krypteras och används bara för att hämta din träningsdata.
+                                </div>
                             </div>
                             <input
                                 type="email"
@@ -111,7 +133,7 @@ export default function Login({ onLogin }) {
                                 onKeyDown={e => e.key === "Enter" && submit()}
                                 style={inputStyle(colors)}
                             />
-                        </>
+                        </div>
                     )}
 
                     {fel && (

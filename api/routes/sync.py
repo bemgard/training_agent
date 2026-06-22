@@ -39,5 +39,7 @@ def sync(db=Depends(get_db), user=Depends(get_current_user)):
         }
     )
     if result.returncode != 0:
+        print("SYNC ERROR:", result.stderr)
+        print("SYNC STDOUT:", result.stdout)
         return {"ok": False, "error": result.stderr}
     return {"ok": True, "output": result.stdout}
