@@ -56,8 +56,7 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
     c.execute(f"""
         SELECT typ, formaterat, datum FROM personal_records
         WHERE current = 1 AND user_id = {ph}
-        AND typ IN ('Best 1km Run', 'Best Half Marathon', 'Best Full Marathon', 'Farthest Run')
-        ORDER BY datum
+        AND typ IN ('Best 1km Run', 'Best Half Marathon', 'Best Full Marathon', 'Farthest Run', 'Estimated 5K', 'Estimated 10K', 'Estimated Half Marathon', 'Estimated Marathon')        ORDER BY datum
     """, (user_id,))
     pr = c.fetchall()
 
@@ -77,6 +76,13 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
         ORDER BY datum DESC LIMIT 1
     """, (user_id,))
     sömn = c.fetchone()
+    
+    c.execute(f"""
+        SELECT time_5k, time_10k, time_half, time_marathon, datum
+        FROM race_predictions WHERE user_id = {ph}
+        ORDER BY datum DESC LIMIT 1
+    """, (user_id,))
+    predictions = c.fetchone()
 
     atta_veckor = (datetime.now() - timedelta(weeks=8)).strftime("%Y-%m-%d")
     c.execute(f"""
@@ -106,5 +112,6 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
         "veckosammanfattning": veckor,
         "aktiviteter": result,
         "veckans_aktiviteter": [dict(v) for v in veckans],
-        "sömn": dict(sömn) if sömn else {}
+        "sömn": dict(sömn) if sömn else {},
+        "race_predictions": dict(predictions) if predictions else {}
     }

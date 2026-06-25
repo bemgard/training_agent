@@ -24,7 +24,28 @@ def get_conn():
     import psycopg2
     return psycopg2.connect(DATABASE_URL)
 
-def sync():
+def beräkna_estimat(c, ph, insert_ignore, on_conflict, user_id, idag, distans_km, etikett):
+    c.execute(f"""
+        SELECT distans_km, duration_min FROM activities
+        WHERE user_id = {ph} AND typ = 'running' AND distans_km >= {ph}
+        ORDER BY (duration_min / distans_km) ASC LIMIT 1
+    """, (user_id, distans_km))
+    bäst = c.fetchone()
+    if not bäst:
+        return
+    d, t = bäst[0], bäst[1]
+    tempo_min_per_km = t / d
+    tid_sek = tempo_min_per_km * distans_km * 60
+    h, m, s = int(tid_sek // 3600), int((tid_sek % 3600) // 60), int(tid_sek % 60)
+    formaterat = f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m}:{s:02d}"
+
+    c.execute(f"DELETE FROM personal_records WHERE typ = {ph} AND user_id = {ph}", (etikett, user_id))
+    c.execute(f"""
+        INSERT INTO personal_records (typ, formaterat, datum, user_id, current)
+        VALUES ({ph}, {ph}, {ph}, {ph}, 1)
+    """, (etikett, formaterat, idag, user_id))
+    
+def sync(full_sync=False):
     from garminconnect import Garmin
 
     user_id = os.getenv("SYNC_USER_ID")
@@ -48,8 +69,17 @@ def sync():
     conn = get_conn()
     c = conn.cursor()
 
-    sedan = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    # Fullsynk hämtar flera år tillbaka (för ny användare eller manuell backfill)
+    # Normal synk hämtar bara senaste månaden (daglig drift)
+    dagar_aktivitet = 1825 if full_sync else 30   # ~5 år vid fullsynk
+    dagar_dagsdata = 365 if full_sync else 30      # 1 år vid fullsynk för hälsa/sömn
+    dagar_vo2max = 730 if full_sync else 60        # 2 år vid fullsynk
+
+    
+    sedan = (datetime.now() - timedelta(days=dagar_aktivitet)).strftime("%Y-%m-%d")
     idag = datetime.now().strftime("%Y-%m-%d")
+
+    print(f"🔧 Läge: {'FULLSYNK' if full_sync else 'Daglig synk'}\n")
 
     # ── 1. Aktiviteter ─────────────────────────────────────────
     print("📥 Hämtar aktiviteter...")
@@ -75,17 +105,34 @@ def sync():
             tempo_sek = (duration_min * 60) / distans_km
             snitt_tempo = f"{int(tempo_sek // 60)}:{int(tempo_sek % 60):02d}/km"
 
+        snitt_kadens = a.get("averageRunningCadenceInStepsPerMinute")
+
+        zon_sek = [None, None, None, None, None]
+        activity_id = a.get("activityId")
+        if activity_id:
+            try:
+                zoner = client.get_activity_hr_in_timezones(activity_id)
+                for z in zoner:
+                    idx = z.get("zoneNumber")
+                    sek = z.get("secsInZone")
+                    if idx and 1 <= idx <= 5:
+                        zon_sek[idx - 1] = round(sek) if sek else 0
+            except Exception:
+                pass
+
         c.execute(f"""
             {insert_ignore} INTO activities
             (activity_id, datum, namn, typ, distans_km, duration_min, snitt_puls, max_puls,
-             kalorier, elevation_gain, snitt_tempo, plats, user_id)
-            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+             kalorier, elevation_gain, snitt_tempo, plats, user_id, snitt_kadens,
+             zon1_sek, zon2_sek, zon3_sek, zon4_sek, zon5_sek)
+            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
             {on_conflict}
         """, (
-            a.get("activityId"), datum, a.get("activityName", ""), typ,
+            activity_id, datum, a.get("activityName", ""), typ,
             distans_km, duration_min, a.get("averageHR"), a.get("maxHR"),
             round(a.get("calories") or 0, 1), round(a.get("elevationGain") or 0, 1),
-            snitt_tempo, a.get("locationName", ""), user_id
+            snitt_tempo, a.get("locationName", ""), user_id, snitt_kadens,
+            zon_sek[0], zon_sek[1], zon_sek[2], zon_sek[3], zon_sek[4]
         ))
         if c.rowcount > 0:
             nya_aktiviteter += 1
@@ -96,7 +143,7 @@ def sync():
     print("📥 Hämtar hälsodata...")
     nya_hälsa = 0
 
-    for i in range(30):
+    for i in range(dagar_dagsdata):
         dag = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
         try:
             data = client.get_stats(dag)
@@ -135,7 +182,7 @@ def sync():
     print("📥 Hämtar sömndata...")
     ny_sömn = 0
 
-    for i in range(30):
+    for i in range(dagar_dagsdata):
         dag = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
         try:
             sömn = client.get_sleep_data(dag)
@@ -172,18 +219,26 @@ def sync():
     # ── 4. VO2max ──────────────────────────────────────────────
     print("📥 Hämtar VO2max...")
     try:
-        vo2_data = client.get_max_metrics(idag)
-        if vo2_data:
-            for entry in vo2_data:
-                vo2 = entry.get("generic", {}).get("vo2MaxPreciseValue")
-                datum = entry.get("calendarDate")
-                if vo2 and datum:
-                    c.execute(f"""
-                        {insert_ignore} INTO vo2max_history (datum, vo2max, user_id)
-                        VALUES ({ph}, {ph}, {ph})
-                        {on_conflict}
-                    """, (datum, vo2, user_id))
-        print(f"  ✅ VO2max uppdaterad")
+        hittade_vo2 = 0
+        max_dagar_att_söka = 1095  # 3 år som absolut yttre gräns
+        for i in range(max_dagar_att_söka):
+            dag = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            vo2_data = client.get_max_metrics(dag)
+
+            if vo2_data:
+                for entry in vo2_data:
+                    vo2 = entry.get("generic", {}).get("vo2MaxPreciseValue")
+                    datum = entry.get("generic", {}).get("calendarDate")
+                    if vo2 and datum:
+                        c.execute(f"""
+                            {insert_ignore} INTO vo2max_history (datum, vo2max, user_id)
+                            VALUES ({ph}, {ph}, {ph})
+                            {on_conflict}
+                        """, (datum, vo2, user_id))
+                        hittade_vo2 += 1
+                if hittade_vo2 > 0:
+                    break  # sluta vid första träffen, oavsett hur långt bak
+        print(f"  ✅ {hittade_vo2} VO2max-värden sparade" if hittade_vo2 else "  ⚠️ Inget VO2max hittat")
     except Exception as e:
         print(f"  ⚠️  VO2max misslyckades: {e}")
 
@@ -205,10 +260,41 @@ def sync():
     except Exception as e:
         print(f"  ⚠️  Profil misslyckades: {e}")
 
+    # ── 6. Race predictions ─────────────────────────────────────
+    print("📥 Hämtar race predictions...")
+    try:
+        pred = client.get_race_predictions()
+        if pred:
+            c.execute(f"""
+                {insert_ignore} INTO race_predictions
+                (user_id, datum, time_5k, time_10k, time_half, time_marathon)
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                {on_conflict}
+            """, (
+                user_id, idag,
+                pred.get("time5K"), pred.get("time10K"),
+                pred.get("timeHalfMarathon"), pred.get("timeMarathon")
+            ))
+        print("  ✅ Race predictions sparade")
+    except Exception as e:
+        print(f"  ⚠️  Race predictions misslyckades: {e}")
+
+    # ── 7. Estimerade PR för alla standarddistanser ──────────────
+    print("📥 Beräknar estimerade PR (5K, 10K, halvmaraton, maraton)...")
+    try:
+        beräkna_estimat(c, ph, insert_ignore, on_conflict, user_id, idag, 5, "Estimated 5K")
+        beräkna_estimat(c, ph, insert_ignore, on_conflict, user_id, idag, 10, "Estimated 10K")
+        beräkna_estimat(c, ph, insert_ignore, on_conflict, user_id, idag, 21.1, "Estimated Half Marathon")
+        beräkna_estimat(c, ph, insert_ignore, on_conflict, user_id, idag, 42.2, "Estimated Marathon")
+        print("  ✅ Estimerade PR uppdaterade")
+    except Exception as e:
+        print(f"  ⚠️  Estimat misslyckades: {e}")
+
     conn.commit()
     conn.close()
     print("\n✅ Synk klar!")
 
 
 if __name__ == "__main__":
-    sync()
+    full = os.getenv("FULL_SYNC", "false").lower() == "true"
+    sync(full_sync=full)

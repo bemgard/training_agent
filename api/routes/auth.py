@@ -68,11 +68,6 @@ def login(req: LoginRequest, db=Depends(get_db)):
     c = db.cursor()
     c.execute(f"SELECT * FROM users WHERE email = {ph}", (req.email,))
     user = c.fetchone()
-    print("LOGIN DEBUG: email =", repr(req.email))
-    print("LOGIN DEBUG: user hittad =", user is not None)
-    if user:
-        print("LOGIN DEBUG: hash i db =", user["lösenord_hash"][:20], "...")
-        print("LOGIN DEBUG: lösenord matchar =", verifiera_lösenord(req.lösenord, user["lösenord_hash"]))
     if not user or not verifiera_lösenord(req.lösenord, user["lösenord_hash"]):
         raise HTTPException(status_code=401, detail="Fel email eller lösenord")
     token = skapa_token(user["id"], user["email"])

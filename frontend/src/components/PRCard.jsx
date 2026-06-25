@@ -2,11 +2,13 @@ import { TrendingUp, Zap } from "lucide-react"
 import { useState } from "react"
 import { streamChat } from "../api"
 
-const labels = {
-  "Best 1km Run": "1 km",
-  "Best Half Marathon": "Halvmaraton",
-  "Best Full Marathon": "Maraton",
-  "Farthest Run": "Längsta"
+function sekTillFormat(sek) {
+  if (!sek) return "—"
+  const h = Math.floor(sek / 3600)
+  const m = Math.floor((sek % 3600) / 60)
+  const s = Math.round(sek % 60)
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+  return `${m}:${String(s).padStart(2, "0")}`
 }
 
 export default function PRCard({ records, profile }) {
@@ -20,7 +22,19 @@ export default function PRCard({ records, profile }) {
     const prompt = `Idag är ${idag}. Rekommendera ett träningspass för idag baserat på min nuvarande återhämtningsstatus och träningshistorik. Var konkret: ange passtyp, distans, tempo och pulszon. Max 4 meningar.`
     await streamChat(prompt, [], (full) => setFörslag(full))
     setLaddar(false)
-}
+  }
+
+  const prMap = {}
+records.forEach(r => { prMap[r.typ] = r.formaterat })
+
+  const predictions = profile?.race_predictions || {}
+
+  const rader = [
+    { label: "5 km", pr: prMap["Estimated 5K"], prognos: sekTillFormat(predictions.time_5k) },
+    { label: "10 km", pr: prMap["Estimated 10K"], prognos: sekTillFormat(predictions.time_10k) },
+    { label: "Halvmaraton", pr: prMap["Best Half Marathon"], prognos: sekTillFormat(predictions.time_half) },
+    { label: "Maraton", pr: prMap["Best Full Marathon"], prognos: sekTillFormat(predictions.time_marathon) },
+  ]
 
   return (
     <div style={{
@@ -32,7 +46,7 @@ export default function PRCard({ records, profile }) {
       gridTemplateColumns: "1fr 1fr",
       gap: 24,
     }}>
-      {/* Vänster — Personliga rekord */}
+      {/* Vänster — Personliga rekord + Garmins prognos */}
       <div>
         <div style={{
           color: "#64748b",
@@ -44,16 +58,29 @@ export default function PRCard({ records, profile }) {
           alignItems: "center",
           gap: 8
         }}>
-          <TrendingUp size={14} color="#6ee7b7" /> Personliga rekord
+          <TrendingUp size={14} color="#6ee7b7" /> Personbästa vs Garmins prognos
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {records.map(r => (
-            <div key={r.typ}>
-              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>
-                {labels[r.typ] || r.typ}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <div></div>
+            <div>PB</div>
+            <div>Garmin prognos</div>
+          </div>
+          {rader.map(({ label, pr, prognos }) => (
+            <div key={label} style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              alignItems: "baseline",
+              borderBottom: "1px solid #1e2736",
+              paddingBottom: 8,
+            }}>
+              <div style={{ fontSize: 12, color: "#94a3b8" }}>{label}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: pr ? "#e2e8f0" : "#334155" }}>
+                {pr || "—"}
               </div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#e2e8f0", letterSpacing: "-0.02em" }}>
-                {r.formaterat}
+              <div style={{ fontSize: 16, fontWeight: 600, color: "#fb923c" }}>
+                {prognos}
               </div>
             </div>
           ))}

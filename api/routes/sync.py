@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Header, HTTPException
 import subprocess
 import sys
+import os
 from pathlib import Path
 from api.database import get_db
 from api.routes.auth import verifiera_token
@@ -27,19 +28,25 @@ def sync(db=Depends(get_db), user=Depends(get_current_user)):
     garmin_email = dekryptera(row["garmin_email"])
     garmin_password = dekryptera(row["garmin_password"])
 
+    # Kolla om användaren redan har data — om inte, kör fullsynk
+    c.execute(f"SELECT COUNT(*) as cnt FROM activities WHERE user_id = {ph}", (user_id,))
+    antal = c.fetchone()["cnt"]
+    är_första_synk = antal == 0
+
     result = subprocess.run(
         [sys.executable, str(Path(__file__).parent.parent.parent / "scripts" / "sync_garmin.py")],
         capture_output=True,
         text=True,
         env={
-            **__import__("os").environ,
+            **os.environ,
             "GARMIN_EMAIL": garmin_email,
             "GARMIN_PASSWORD": garmin_password,
             "SYNC_USER_ID": str(user_id),
+            "FULL_SYNC": "true" if är_första_synk else "false",
         }
     )
     if result.returncode != 0:
         print("SYNC ERROR:", result.stderr)
         print("SYNC STDOUT:", result.stdout)
         return {"ok": False, "error": result.stderr}
-    return {"ok": True, "output": result.stdout}
+    return {"ok": True, "output": result.stdout, "full_sync": är_första_synk}
