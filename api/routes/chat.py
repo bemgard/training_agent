@@ -71,7 +71,7 @@ async def chat(request: ChatRequest, authorization: str = Header(None)):
     def generate():
         with client.messages.stream(
             model="claude-haiku-4-5-20251001",
-            max_tokens=500,
+            max_tokens=10000,
             system=system,
             messages=messages
         ) as stream:

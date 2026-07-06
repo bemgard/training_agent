@@ -1,7 +1,8 @@
-import { Activity, Heart, Zap, TrendingUp, Moon } from "lucide-react"
+import { Activity, Heart, Zap, TrendingUp } from "lucide-react"
 import KPICard from "./KPICard"
 import SenasteAktivitet from "./SenasteAktivitet"
 import PRCard from "./PRCard"
+import SleepChart from "./SleepChart"
 import WeeklyLoad from "./WeeklyLoad"
 import ActivityLog from "./ActivityLog"
 
@@ -38,26 +39,15 @@ export default function Dashboard({ profile, aiSummary, onOpenChat }) {
   const bbData = [...hälsa].reverse().map(d => d.body_battery_hogst)
   const stegData = [...hälsa].reverse().map(d => d.steg)
 
-  const sömnText = profile?.sömn?.sovtid_min
-    ? `${Math.floor(profile.sömn.sovtid_min / 60)}h ${Math.round(profile.sömn.sovtid_min % 60)}m`
-    : "—"
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
         <KPICard
           icon={Activity}
           label="Träningsstatus"
           value={status.label}
           sub={`Belastning ${status.delta >= 0 ? "↑" : "↓"} ${Math.abs(Math.round(status.delta))}%`}
           color={status.color}
-        />
-        <KPICard
-          icon={Moon}
-          label="Sömn"
-          value={sömnText}
-          sub={profile?.sömn?.djup_sov_min ? `Djup sömn: ${Math.round(profile.sömn.djup_sov_min)}min` : "Ingen data"}
-          color="#a78bfa"
         />
         <KPICard
           icon={TrendingUp}
@@ -101,6 +91,7 @@ export default function Dashboard({ profile, aiSummary, onOpenChat }) {
         <PRCard records={profile?.personliga_rekord || []} profile={profile} />
       </div>
 
+      <SleepChart sömnVecka={profile?.sömn_vecka || []} />
       <WeeklyLoad aktiviteter={profile?.aktiviteter} />
       <ActivityLog aktiviteter={profile?.aktiviteter} />
 
