@@ -1,8 +1,6 @@
 anthropic
 python-dotenv
 garminconnect
-chromadb
-sentence-transformers
 fastapi
 uvicorn
 psycopg2-binary
