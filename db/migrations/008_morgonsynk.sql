@@ -4,7 +4,7 @@
 -- klockan är 9 i Stockholm (?lokal_timme=9) → alltid 09:02 oavsett sommar-/vintertid.
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
 -- Hemligheten (samma som CRON_SECRET på Render) läggs i Supabase Vault, inte i klartext i jobbet:
 --   SELECT vault.create_secret('<CRON_SECRET>', 'cron_secret');

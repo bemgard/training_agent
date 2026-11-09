@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,12 +28,17 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Training Agent API", lifespan=lifespan)
 
+# Bara appens egna frontends får anropa API:t från webbläsaren
+TILLÅTNA_URSPRUNG = os.environ.get(
+    "CORS_ORIGINS", "https://training-agent-ai.netlify.app,http://localhost:5173"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[u.strip() for u in TILLÅTNA_URSPRUNG],
+    allow_credentials=False,   # vi använder Bearer-token i header, inte cookies
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(profile.router, prefix="/api")

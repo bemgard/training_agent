@@ -1,13 +1,18 @@
 import os
 import jwt
 import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+import time
+from collections import defaultdict, deque
 from pydantic import BaseModel
 from api.database import get_db
 from api.auth import hasha_lösenord, verifiera_lösenord, kryptera
 
 router = APIRouter()
-JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret")
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET or len(JWT_SECRET) < 32:
+    # Fail closed: utan en riktig hemlighet kan vem som helst förfalska inloggningstoken
+    raise RuntimeError("JWT_SECRET saknas eller är för kort (minst 32 tecken)")
 USE_SQLITE = not os.environ.get("DATABASE_URL")
 ph = "?" if USE_SQLITE else "%s"
 
@@ -21,6 +26,23 @@ class LoginRequest(BaseModel):
     email: str
     lösenord: str
     kom_ihag: bool = False
+
+# ── Skydd mot lösenordsgissning (en instans på Render → minnet räcker) ──────────
+MAX_FEL, FÖNSTER_SEK = 5, 15 * 60
+_misslyckade = defaultdict(deque)       # (ip, email) → tidpunkter för misslyckade inloggningar
+_registreringar = defaultdict(deque)    # ip → tidpunkter för registreringar
+
+
+def klient_ip(request: Request) -> str:
+    vidare = request.headers.get("x-forwarded-for")  # Render ligger bakom en proxy
+    return vidare.split(",")[0].strip() if vidare else (request.client.host if request.client else "okänd")
+
+
+def _rensa(kö, fönster):
+    gräns = time.time() - fönster
+    while kö and kö[0] < gräns:
+        kö.popleft()
+
 
 def skapa_token(user_id: int, email: str, dagar: int = 30) -> str:
     """Kom ihåg mig → 30 dagar. Annars 1 dag (frontend sparar dessutom bara i sessionStorage)."""
@@ -40,7 +62,12 @@ def verifiera_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Ogiltigt token")
 
 @router.post("/auth/register")
-def register(req: RegisterRequest, db=Depends(get_db)):
+def register(req: RegisterRequest, request: Request, db=Depends(get_db)):
+    ip = klient_ip(request)
+    _rensa(_registreringar[ip], 3600)
+    if len(_registreringar[ip]) >= 10:
+        raise HTTPException(status_code=429, detail="För många registreringar — försök igen om en timme")
+    _registreringar[ip].append(time.time())
     c = db.cursor()
     email = req.email.strip().lower()
     if "@" not in email:
@@ -68,11 +95,18 @@ def register(req: RegisterRequest, db=Depends(get_db)):
 
 
 @router.post("/auth/login")
-def login(req: LoginRequest, db=Depends(get_db)):
+def login(req: LoginRequest, request: Request, db=Depends(get_db)):
+    email = req.email.strip().lower()
+    nyckel = (klient_ip(request), email)
+    _rensa(_misslyckade[nyckel], FÖNSTER_SEK)
+    if len(_misslyckade[nyckel]) >= MAX_FEL:
+        raise HTTPException(status_code=429, detail="För många misslyckade försök — vänta 15 minuter och försök igen")
     c = db.cursor()
-    c.execute(f"SELECT * FROM users WHERE LOWER(email) = {ph}", (req.email.strip().lower(),))
+    c.execute(f"SELECT * FROM users WHERE LOWER(email) = {ph}", (email,))
     user = c.fetchone()
     if not user or not verifiera_lösenord(req.lösenord, user["lösenord_hash"]):
+        _misslyckade[nyckel].append(time.time())
         raise HTTPException(status_code=401, detail="Fel e-post eller lösenord")
+    _misslyckade.pop(nyckel, None)
     token = skapa_token(user["id"], user["email"], dagar=30 if req.kom_ihag else 1)
     return {"token": token, "email": user["email"]}
