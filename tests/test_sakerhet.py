@@ -24,6 +24,7 @@ def bygg_schema():
     sql = "\n".join((REPO / "db/migrations" / f).read_text() for f in sorted(os.listdir(REPO / "db/migrations"))
                     if f.endswith(".sql") and not f.startswith("008"))  # 008 = pg_cron, bara Postgres
     sql = re.sub(r"ALTER TABLE \w+ ENABLE ROW LEVEL SECURITY;", "", sql)
+    sql = re.sub(r"^\s*(DROP|CREATE) EXTENSION[^;]*;", "", sql, flags=re.M)  # Postgres-tillägg (pg_net, pg_cron)
     sql = re.sub(r"CHECK \([^)]*\)\)", "", sql)
     sql = sql.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
     sql = sql.replace("TIMESTAMPTZ NOT NULL DEFAULT now()", "TEXT DEFAULT CURRENT_TIMESTAMP").replace("TIMESTAMPTZ DEFAULT now()", "TEXT").replace("TIMESTAMPTZ", "TEXT")
