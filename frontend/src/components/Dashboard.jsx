@@ -11,25 +11,18 @@ import KroppSektion from "./KroppSektion"
 import SomnDetalj from "./SomnDetalj"
 import { useState } from "react"
 
-function getTrainingStatus(hälsa, veckor) {
-  const bb = hälsa[0]?.body_battery_hogst
-  const stress = hälsa[0]?.stress_snitt
-  const kmDennVecka = veckor[0]?.total_km || 0
-  const kmFörraVeckan = veckor[1]?.total_km || 0
-  const belastningDelta = kmFörraVeckan ? ((kmDennVecka - kmFörraVeckan) / kmFörraVeckan) * 100 : 0
-
-  if (bb > 70 && stress < 40) return { label: "Produktiv", color: "#f97316", delta: belastningDelta }
-  if (bb > 50) return { label: "Balanserad", color: "#06b6d4", delta: belastningDelta }
-  if (bb < 30) return { label: "Vila", color: "#ef4444", delta: belastningDelta }
-  return { label: "Återhämtning", color: "#a78bfa", delta: belastningDelta }
+const BELASTNINGSZON = {
+  låg: { label: "låg", color: "#60a5fa" },
+  optimal: { label: "optimal", color: "#6ee7b7" },
+  förhöjd: { label: "förhöjd", color: "#fbbf24" },
+  hög: { label: "hög", color: "#ef4444" },
 }
 
 export default function Dashboard({ profile, aiSummary, onOpenChat, onUppdatera }) {
   const [visaSömn, setVisaSömn] = useState(false)
   const hälsa = profile?.hälsodata || []
-  const veckor = profile?.veckosammanfattning || []
+  const belastningNu = profile?.belastning?.[profile.belastning.length - 1]
   const hälsaMedData = hälsa.filter(d => d.body_battery_hogst)
-  const status = getTrainingStatus(hälsaMedData, veckor)
 
   const bbSnitt = Math.round(
     hälsaMedData.reduce((a, b) => a + (b.body_battery_hogst || 0), 0) /
@@ -55,10 +48,12 @@ export default function Dashboard({ profile, aiSummary, onOpenChat, onUppdatera 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
         <KPICard
           icon={Activity}
-          label="Träningsstatus"
-          value={status.label}
-          sub={`Belastning ${status.delta >= 0 ? "↑" : "↓"} ${Math.abs(Math.round(status.delta))}%`}
-          color={status.color}
+          label="Belastning (ACWR)"
+          value={belastningNu?.acwr != null ? belastningNu.acwr.toFixed(2) : "—"}
+          unit={BELASTNINGSZON[belastningNu?.zon]?.label}
+          sub={belastningNu?.kronisk != null ? `7 d: ${belastningNu.akut} · normalt: ${belastningNu.kronisk}/v` : "Kräver 4 veckors historik"}
+          color={BELASTNINGSZON[belastningNu?.zon]?.color || "#64748b"}
+          sparkline={(profile?.belastning || []).map(d => d.akut)}
         />
         <KPICard
           icon={TrendingUp}

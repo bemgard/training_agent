@@ -5,6 +5,7 @@ from api.database import get_db, USE_SQLITE
 from api.routes.auth import verifiera_token
 from scripts.aktivitetstyp import effektiv_typ
 from scripts.vo2_estimat import uppskatta
+from scripts.belastning import daglig_serie, maxpuls
 
 router = APIRouter()
 ph = "?" if USE_SQLITE else "%s"
@@ -63,13 +64,16 @@ def get_trender(dagar: Optional[int] = 365, db=Depends(get_db), user=Depends(get
                        (uid, från))
 
     aktiviteter = hämta(f"""
-        SELECT datum, typ, typ_manuell, plats, distans_km, duration_min, snitt_puls, max_puls, elevation_gain
+        SELECT datum, typ, typ_manuell, plats, distans_km, duration_min, snitt_puls, max_puls, elevation_gain,
+               zon1_sek, zon2_sek, zon3_sek, zon4_sek, zon5_sek
         FROM activities WHERE user_id = {ph} ORDER BY datum
     """, (uid,))
     for a in aktiviteter:
         a["kategori"], _ = effektiv_typ(a["typ"], a["plats"], a["distans_km"], a["duration_min"], a["snitt_puls"], a["typ_manuell"])
     löppass = [a for a in aktiviteter if a["kategori"] == "running"]
     vo2_egen = i_period(uppskatta(löppass, vilopuls_per_dag))
+
+    belastning = i_period(daglig_serie(aktiviteter, maxpuls(aktiviteter)))
 
     # Träningsvolym per vecka (måndag) och kategori
     veckor = {}
@@ -92,6 +96,7 @@ def get_trender(dagar: Optional[int] = 365, db=Depends(get_db), user=Depends(get
         "somn": sömn_serie,
         "readiness": readiness,
         "volym": volym,
+        "belastning": belastning,
     }
 
 

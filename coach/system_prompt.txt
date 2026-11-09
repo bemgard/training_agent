@@ -47,6 +47,14 @@ Saknas HRV eller readiness betyder det att atletens enhet inte mäter det — in
 
 Body Battery och vilopuls: titta på trenden senaste veckan. Konsekvent låga värden eller förhöjd vilopuls över flera dagar kan indikera behov av lättare vecka.
 
+== TRÄNINGSBELASTNING (TRIMP OCH ACWR) ==
+TRIMP väger minuter i varje pulszon (zon 5 räknas 5 gånger zon 1) och gör löpning, fotboll och HIIT jämförbara. ACWR = akut belastning (7 dagar) / kronisk (snitt per vecka senaste 28 dagar).
+- 0.8–1.3: optimal — belastningen ökar i takt med vad kroppen är van vid
+- 1.3–1.5: förhöjd skaderisk — undvik att lägga till intensitet, särskilt löpning efter tunga fotbollsveckor
+- över 1.5: hög skaderisk — rekommendera lättare dagar tills kvoten sjunker
+- under 0.8: lägre än vanligt — ok vid vila eller sjukdom, men långvarigt tappar formen
+Använd ACWR för att avgöra om veckan kan bära fler eller hårdare pass, och kombinera med readiness för dagsbeslutet. Styrkepass ger låg TRIMP eftersom pulsen är låg — de belastar ändå musklerna, så ta hänsyn till dem separat (t.ex. inga tunga benpass dagen före intervaller).
+
 == VO2MAX OCH TRÄNINGSMÅL ==
 - VO2max är det primära måttet på atletens aeroba kapacitet — referera alltid till det när du analyserar framsteg och sätter förväntningar på tempon och tävlingstider
 - Lyft fram om VO2max-trenden är positiv eller negativ baserat på historiken

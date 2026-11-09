@@ -5,9 +5,11 @@ from pathlib import Path
 try:
     from scripts.aktivitetstyp import effektiv_typ, KATEGORIER
     from scripts.kropp import beräkna as beräkna_kropp
+    from scripts.belastning import daglig_serie, maxpuls as maxpuls_belastning
 except ImportError:
     from aktivitetstyp import effektiv_typ, KATEGORIER
     from kropp import beräkna as beräkna_kropp
+    from belastning import daglig_serie, maxpuls as maxpuls_belastning
 
 BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "training.db"
@@ -209,6 +211,14 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     """, uid_val)
     senaste_dagar = c.fetchall()
 
+    c.execute(f"""
+        SELECT datum, snitt_puls, max_puls, duration_min, zon1_sek, zon2_sek, zon3_sek, zon4_sek, zon5_sek
+        FROM activities {('WHERE user_id = ' + ph) if user_id else ''} ORDER BY datum
+    """, uid_val)
+    kolumner = ["datum", "snitt_puls", "max_puls", "duration_min", "zon1_sek", "zon2_sek", "zon3_sek", "zon4_sek", "zon5_sek"]
+    alla_pass = [dict(zip(kolumner, r)) for r in c.fetchall()]
+    belastning = daglig_serie(alla_pass, maxpuls_belastning(alla_pass))
+
     kropp = []
     kroppsprofil = (None, None, None)
     if user_id:
@@ -258,6 +268,13 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     lines.append(f"  Zon 2: {pulszoner['zon2'][0]}-{pulszoner['zon2'][1]} bpm | faktiskt tempo: {kmh_till_tempo(zon2[1])} | {zon2[2]} pass")
     lines.append(f"  Zon 3: {pulszoner['zon3'][0]}-{pulszoner['zon3'][1]} bpm | faktiskt tempo: {kmh_till_tempo(zon3[1])} | {zon3[2]} pass")
     lines.append(f"  Zon 4: {pulszoner['zon4'][0]}-{pulszoner['zon4'][1]} bpm | faktiskt tempo: {kmh_till_tempo(zon4[1])} | {zon4[2]} pass")
+
+    if belastning and belastning[-1]["kronisk"] is not None:
+        b = belastning[-1]
+        lines.append("\nTRÄNINGSBELASTNING (Edwards TRIMP från pulszoner — mäter kondition, inte muskulär belastning från styrka):")
+        lines.append(f"  Akut (7 d): {b['akut']} | Kronisk (snitt/vecka, 28 d): {b['kronisk']} | ACWR: {b['acwr']} → {b['zon']}")
+        veckovis = [belastning[i] for i in range(len(belastning) - 1, max(-1, len(belastning) - 29), -7)]
+        lines.append("  Akut belastning vecka för vecka (nyast först): " + ", ".join(f"{x['datum']}: {x['akut']}" for x in veckovis))
 
     lines.append(f"\nVECKOSAMMANFATTNING (senaste {veckor} veckor):")
     for vecka in sorted(veckor_data.keys(), reverse=True):

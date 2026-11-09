@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react"
-import { Heart, HeartPulse, TrendingUp, Moon, Gauge, BarChart3, X } from "lucide-react"
+import { Heart, HeartPulse, TrendingUp, Moon, Gauge, BarChart3, Flame, Scale3d, X } from "lucide-react"
 import { fetchTrender } from "../api"
 import { kategoriInfo, lokaltDatum, formatMinuter } from "../aktivitetstyper"
 
@@ -290,6 +290,8 @@ function Detaljvy({ graf, från, till, onStäng }) {
 function byggGrafer(data) {
   const vp = data.vilopuls, hrv = data.hrv, sömn = data.somn, rd = data.readiness
   const vo2g = data.vo2max.garmin, vo2e = data.vo2max.egen
+  const bel = data.belastning || [], senBel = bel[bel.length - 1]
+  const ZON = { låg: "#60a5fa", optimal: "#6ee7b7", förhöjd: "#fbbf24", hög: "#ef4444" }
   const senVp = vp[vp.length - 1], senHrv = hrv[hrv.length - 1], senVo2 = vo2g[vo2g.length - 1], senEgen = vo2e[vo2e.length - 1]
   const heltal = v => (v == null ? "—" : Math.round(v))
   const enDec = v => (v == null ? "—" : v.toFixed(1))
@@ -360,6 +362,31 @@ function byggGrafer(data) {
       nyckeltal: { punkter: rd.map(p => ({ datum: p.datum, v: p.poang })), format: heltal, enhet: "" },
       legend: [{ namn: "per dag", färg: "#6ee7b7", opacitet: 0.3 }, { namn: "7 dagars snitt", färg: "#6ee7b7" }],
       förklaring: rd.length ? "0–24 dålig · 25–49 låg · 50–74 måttlig · 75–94 hög · 95–100 topp" : "Kräver en Garmin-enhet med Training Readiness.",
+    },
+    {
+      nyckel: "belastning", ikon: Flame, titel: "Träningsbelastning (TRIMP)", färg: "#fb923c", enhetKort: "",
+      värde: senBel?.akut ?? null, enhet: "senaste 7 d",
+      sub: senBel?.kronisk != null ? <>normalt {senBel.kronisk}/vecka<br />{delta(bel, "akut")}</> : null,
+      graf: { serier: [
+        { namn: "Per dag", punkter: bel.map(p => ({ datum: p.datum, v: p.trimp || null })), färg: "#fb923c", opacitet: 0.4, prickar: true, prickStorlek: 4, bredd: 0, hoverRadie: 0.5 },
+        { namn: "Akut (7 d)", punkter: bel.map(p => ({ datum: p.datum, v: p.akut })), färg: "#fb923c", bredd: 2.5, maxLucka: 2, hoverRadie: 0.5 },
+        { namn: "Kronisk (snitt/v)", punkter: bel.map(p => ({ datum: p.datum, v: p.kronisk })), färg: "#94a3b8", bredd: 2, streckad: true, maxLucka: 2, hoverRadie: 0.5 },
+      ], yFormat: heltal },
+      nyckeltal: { punkter: bel.map(p => ({ datum: p.datum, v: p.akut })), format: heltal, enhet: "" },
+      legend: [{ namn: "akut (7 d)", färg: "#fb923c" }, { namn: "kronisk (snitt/vecka, 28 d)", färg: "#94a3b8" }, { namn: "pass", färg: "#fb923c", opacitet: 0.4, prick: true }],
+      förklaring: "Edwards TRIMP: minuter i pulszon × zonnummer, så zon 5 väger 5 gånger zon 1. Mäter konditionsbelastning — styrkepass ger låga värden trots att de belastar musklerna.",
+    },
+    {
+      nyckel: "acwr", ikon: Scale3d, titel: "Belastningskvot (ACWR)", färg: ZON[senBel?.zon] || "#64748b", enhetKort: "",
+      värde: senBel?.acwr != null ? senBel.acwr.toFixed(2) : null, enhet: senBel?.zon || "",
+      sub: <>optimalt 0,8–1,3<br />{delta(bel, "acwr", false, 2)}</>,
+      graf: {
+        band: bel.filter(p => p.acwr != null).map(p => ({ datum: p.datum, låg: 0.8, hög: 1.3 })),
+        serier: [{ namn: "ACWR", punkter: bel.map(p => ({ datum: p.datum, v: p.acwr })), färg: ZON[senBel?.zon] || "#94a3b8", bredd: 2.5, maxLucka: 2, hoverRadie: 0.5 }],
+        yFormat: v => v.toFixed(1) },
+      nyckeltal: { punkter: bel.map(p => ({ datum: p.datum, v: p.acwr })), format: v => (v == null ? "—" : v.toFixed(2)), enhet: "" },
+      legend: [{ namn: "ACWR = akut / kronisk", färg: ZON[senBel?.zon] || "#94a3b8" }, { namn: "optimal zon 0,8–1,3", färg: ZON[senBel?.zon] || "#94a3b8", opacitet: 0.25 }],
+      förklaring: "Över 1,3 ökar skaderisken, över 1,5 tydligt (Gabbett 2016). Under 0,8 tränar du mindre än kroppen är van vid.",
     },
     {
       nyckel: "volym", ikon: BarChart3, titel: "Träningsvolym", färg: "#f97316", enhetKort: "",

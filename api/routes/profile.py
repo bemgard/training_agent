@@ -6,6 +6,7 @@ from api.routes.auth import verifiera_token
 from pydantic import BaseModel
 from typing import Optional
 from scripts.aktivitetstyp import effektiv_typ, KATEGORIER
+from scripts.belastning import daglig_serie, maxpuls
 
 router = APIRouter()
 ph = "?" if USE_SQLITE else "%s"
@@ -87,6 +88,13 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
     readiness = c.fetchall()
 
     c.execute(f"""
+        SELECT datum, snitt_puls, max_puls, duration_min, zon1_sek, zon2_sek, zon3_sek, zon4_sek, zon5_sek
+        FROM activities WHERE user_id = {ph} ORDER BY datum
+    """, (user_id,))
+    alla_pass = [dict(r) for r in c.fetchall()]
+    belastning_serie = daglig_serie(alla_pass, maxpuls(alla_pass))[-28:]
+
+    c.execute(f"""
         SELECT datum, hrv_natt, hrv_7d, hrv_baslinje_lag, hrv_baslinje_hog, hrv_status
         FROM sleep_daily WHERE user_id = {ph} AND hrv_natt IS NOT NULL
         ORDER BY datum DESC LIMIT 14
@@ -134,6 +142,7 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
         "race_predictions": dict(predictions) if predictions else {},
         "readiness": [dict(r) for r in readiness],
         "hrv": [dict(h) for h in hrv],
+        "belastning": belastning_serie,
     }
 
 class TypRequest(BaseModel):
