@@ -1,7 +1,8 @@
+import { hämtaToken } from "./token"
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
 function getHeaders() {
-    const token = localStorage.getItem("token")
+    const token = hämtaToken()
     return {
         "Content-Type": "application/json",
         ...(token ? { "Authorization": `Bearer ${token}` } : {})
@@ -39,11 +40,11 @@ export async function syncGarmin() {
     const res = await fetch(`${API}/sync`, { method: "POST", headers: getHeaders() })
     return res.json()
 }
-export async function loginUser(email, lösenord) {
+export async function loginUser(email, lösenord, kom_ihag = false) {
     const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, lösenord })
+        body: JSON.stringify({ email, lösenord, kom_ihag })
     })
     return { ok: res.ok, data: await res.json() }
 }

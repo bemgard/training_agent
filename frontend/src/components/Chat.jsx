@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react"
+import { hämtaToken } from "../token"
 import { Send } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import { streamChat } from "../api"
@@ -47,7 +48,7 @@ function ChatMessage({ role, content }) {
   const visningsText = content.replace(/\[PASS\].*?\[\/PASS\]/s, "").trim()
 
   async function sparaPass() {
-    const token = localStorage.getItem("token")
+    const token = hämtaToken()
     try {
       await fetch(`${API}/save-pass`, {
         method: "POST",

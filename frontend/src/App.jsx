@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { fetchProfile } from "./api"
+import { hämtaToken, rensaToken } from "./token"
 import Header from "./components/Header"
 import Dashboard from "./components/Dashboard"
 import Chat from "./components/Chat"
@@ -12,7 +13,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("dashboard")
   const [chatInitialInput, setChatInitialInput] = useState("")
-  const [token, setToken] = useState(localStorage.getItem("token"))
+  const [token, setToken] = useState(hämtaToken())
 
   useEffect(() => {
     if (!token) {
@@ -21,7 +22,12 @@ export default function App() {
     }
     fetchProfile()
       .then(data => {
-        setProfile(data)
+        if (data?.detail) {  // utgånget/ogiltigt token → tillbaka till inloggning
+          rensaToken()
+          setToken(null)
+        } else {
+          setProfile(data)
+        }
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -36,8 +42,7 @@ export default function App() {
   }
 
   function onLogout() {
-    localStorage.removeItem("token")
-    localStorage.removeItem("email")
+    rensaToken()
     setToken(null)
     setProfile(null)
   }
