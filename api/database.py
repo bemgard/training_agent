@@ -13,6 +13,14 @@ if USE_SQLITE:
     BASE_DIR = Path(__file__).parent.parent
     DB_PATH = BASE_DIR / "data" / "training.db"
 
+def open_conn():
+    if USE_SQLITE:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+    else:
+        return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
 def get_db():
     if USE_SQLITE:
         conn = sqlite3.connect(DB_PATH)

@@ -1,3 +1,7 @@
+# WARNING: This script predates the multi-user architecture.
+# It has no user_id support and will write data without associating it to any user.
+# Do NOT run against a live database without modifying it to accept and stamp a user_id.
+
 import json
 import os
 from pathlib import Path

@@ -5,6 +5,32 @@ import { streamChat } from "../api"
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
+const RUNNER_CSS = `
+@keyframes runner-bounce {
+  0%   { transform: translateX(0px); }
+  50%  { transform: translateX(10px); }
+  100% { transform: translateX(0px); }
+}
+`
+
+function RunnerLoading() {
+  return (
+    <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 16 }}>
+      <div style={{
+        background: "#1a1a26",
+        border: "1px solid #2a2a3a",
+        borderRadius: "16px 16px 16px 4px",
+        padding: "12px 20px",
+        fontSize: 22,
+      }}>
+        <span style={{ display: "inline-block", animation: "runner-bounce 0.7s ease-in-out infinite" }}>
+          🏃
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function extractPass(content) {
   const match = content.match(/\[PASS\](.*?)\[\/PASS\]/s)
   if (!match) return null
@@ -73,11 +99,18 @@ function ChatMessage({ role, content }) {
   )
 }
 
-export default function Chat({ initialMessages = [] }) {
+export default function Chat({ initialMessages = [], initialInput = "", onInitialInputConsumed }) {
   const [messages, setMessages] = useState(initialMessages)
-  const [input, setInput] = useState("")
+  const [input, setInput] = useState(initialInput)
   const [streaming, setStreaming] = useState(false)
   const chatEndRef = useRef(null)
+
+  useEffect(() => {
+    if (initialInput) {
+      setInput(initialInput)
+      onInitialInputConsumed?.()
+    }
+  }, [initialInput])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -105,6 +138,8 @@ export default function Chat({ initialMessages = [] }) {
   }
 
   return (
+    <>
+    <style>{RUNNER_CSS}</style>
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 180px)" }}>
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: 16 }}>
         {messages.length === 0 && (
@@ -113,7 +148,11 @@ export default function Chat({ initialMessages = [] }) {
             <div style={{ fontSize: 16 }}>Ställ en fråga till din träningscoach</div>
           </div>
         )}
-        {messages.map((m, i) => <ChatMessage key={i} {...m} />)}
+        {messages.map((m, i) => {
+          if (streaming && i === messages.length - 1 && m.role === "assistant" && m.content === "")
+            return <RunnerLoading key={i} />
+          return <ChatMessage key={i} {...m} />
+        })}
         <div ref={chatEndRef} />
       </div>
       <div style={{ display: "flex", gap: 12, paddingTop: 16, borderTop: "1px solid #2a2a3a" }}>
@@ -149,5 +188,6 @@ export default function Chat({ initialMessages = [] }) {
         </button>
       </div>
     </div>
+    </>
   )
 }
