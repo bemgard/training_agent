@@ -2,6 +2,12 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
+try:
+    from scripts.aktivitetstyp import effektiv_typ, KATEGORIER
+    from scripts.kropp import beräkna as beräkna_kropp
+except ImportError:
+    from aktivitetstyp import effektiv_typ, KATEGORIER
+    from kropp import beräkna as beräkna_kropp
 
 BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "training.db"
@@ -35,8 +41,6 @@ def load_pulszoner(user_id: int = None) -> dict:
         "max":  max_puls
     }
 
-PULSZONER = load_pulszoner()
-MAX_PULS = PULSZONER["max"]
 
 def classify_activity(typ: str, plats: str, distans_km: float) -> str:
     plats = (plats or "").lower()
@@ -94,7 +98,10 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
 
     pulszoner = load_pulszoner(user_id)
 
-    c.execute(f"SELECT langd_cm, vikt_kg, vo2max FROM user_profile LIMIT 1")
+    if user_id:
+        c.execute(f"SELECT langd_cm, vikt_kg, vo2max FROM user_profile WHERE id = {ph} LIMIT 1", (user_id,))
+    else:
+        c.execute("SELECT langd_cm, vikt_kg, vo2max FROM user_profile LIMIT 1")
     profil = c.fetchone()
 
     c.execute(f"SELECT vo2max, datum FROM vo2max_history {('WHERE user_id = ' + ph) if user_id else ''} ORDER BY datum DESC LIMIT 1", uid_val)
@@ -119,7 +126,7 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     löppass = c.fetchall()
 
     c.execute(f"""
-        SELECT datum, typ, distans_km, duration_min, snitt_puls, plats
+        SELECT datum, typ, distans_km, duration_min, snitt_puls, plats, typ_manuell, namn
         FROM activities
         WHERE datum >= {ph} {uid_filter}
         ORDER BY datum DESC
@@ -127,14 +134,22 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     alla = c.fetchall()
 
     from collections import defaultdict
-    veckor_data = defaultdict(lambda: {"pass": [], "km": 0, "typer": set()})
+    veckor_data = defaultdict(lambda: {"pass": [], "km": 0, "löp_km": 0, "min": 0, "typer": defaultdict(float)})
+    övriga_pass = []
     for rad in alla:
-        datum, typ, distans_km, duration_min, snitt_puls, plats = rad
+        datum, typ, distans_km, duration_min, snitt_puls, plats, typ_manuell, namn = rad
+        kategori, gissad = effektiv_typ(typ, plats, distans_km, duration_min, snitt_puls, typ_manuell)
+        label = KATEGORIER.get(kategori, "Oklassat pass") if kategori else "Oklassat pass"
         vecka = datetime.strptime(datum, "%Y-%m-%d").strftime("%Y-W%W")
-        label = classify_activity(typ, plats, distans_km or 0)
-        veckor_data[vecka]["pass"].append(label)
-        veckor_data[vecka]["km"] += distans_km or 0
-        veckor_data[vecka]["typer"].add(label)
+        v = veckor_data[vecka]
+        v["pass"].append(label)
+        v["km"] += distans_km or 0
+        if kategori == "running":
+            v["löp_km"] += distans_km or 0
+        v["min"] += duration_min or 0
+        v["typer"][label] += duration_min or 0
+        if kategori != "running" and len(övriga_pass) < 15:
+            övriga_pass.append((datum, label + (" (gissning)" if gissad else ""), duration_min, snitt_puls, distans_km))
 
     def zon_stats(low, high):
         c.execute(f"""
@@ -153,12 +168,24 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     zon4 = zon_stats(*pulszoner["zon4"])
 
     c.execute(f"""
-        SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min
+        SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min, rem_sov_min,
+               somnpoang, somn_kvalitet, hrv_natt, hrv_status, hrv_7d,
+               hrv_baslinje_lag, hrv_baslinje_hog, vilopuls_natt, bb_laddning
         FROM sleep_daily
         WHERE datum >= {ph} {uid_filter}
         ORDER BY datum DESC LIMIT 14
     """, ((datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d"),) + uid_val)
     sömn = c.fetchall()
+
+    c.execute(f"""
+        SELECT datum, poang, niva, feedback, somn_faktor, somnhistorik_faktor,
+               aterhamtning_faktor, aterhamtning_min, belastning_faktor, akut_belastning,
+               stress_faktor, hrv_faktor, uppdaterad
+        FROM readiness_daily
+        WHERE datum >= {ph} {uid_filter}
+        ORDER BY datum DESC LIMIT 7
+    """, ((datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),) + uid_val)
+    readiness = c.fetchall()
 
     c.execute(f"""
         SELECT datum, vilpuls, body_battery_hogst, body_battery_lagst, stress_snitt, steg
@@ -182,6 +209,18 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     """, uid_val)
     senaste_dagar = c.fetchall()
 
+    kropp = []
+    kroppsprofil = (None, None, None)
+    if user_id:
+        c.execute(f"SELECT langd_cm, fodelsear, kon FROM users WHERE id = {ph}", (user_id,))
+        kroppsprofil = c.fetchone() or kroppsprofil
+        c.execute(f"""
+            SELECT datum, vikt_kg, fett_procent, muskel_kg FROM weight_log
+            WHERE user_id = {ph} AND datum >= {ph} ORDER BY datum ASC
+        """, (user_id, (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d")))
+        kropp = [beräkna_kropp({"datum": r[0], "vikt_kg": r[1], "fett_procent": r[2], "muskel_kg": r[3]}, *kroppsprofil)
+                 for r in c.fetchall()]
+
     conn.close()
 
     lines = []
@@ -192,6 +231,23 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
         lines.append(f"ANVÄNDARPROFIL: {profil[0]} cm | {profil[1]} kg | VO2max: {profil[2]}")
     if vo2:
         lines.append(f"SENASTE VO2MAX: {vo2[0]} ({vo2[1]})")
+
+    if kropp:
+        k = kropp[-1]
+        rad = f"KROPP (senaste invägning {k['datum']}): {k['vikt_kg']} kg"
+        if k.get("bmi"):
+            rad += f" | BMI {k['bmi']}"
+        if k.get("fett_procent") is not None:
+            rad += f" | fett {k['fett_procent']} %" + (" (grov uppskattning ±5, ej mätt)" if k.get("fett_procent_uppskattad") else " (uppmätt)")
+        if k.get("muskel_kg") is not None:
+            rad += f" | muskelmassa {k['muskel_kg']} kg (uppmätt)"
+        lines.append(rad)
+        gräns = (datetime.strptime(k["datum"], "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
+        tidigare = [x for x in kropp if x["datum"] <= gräns] or kropp[:1]
+        if tidigare and tidigare[-1] is not k:
+            t = tidigare[-1]
+            diff = round(k["vikt_kg"] - t["vikt_kg"], 1)
+            lines.append(f"  Viktförändring sedan {t['datum']}: {'+' if diff >= 0 else ''}{diff} kg ({len(kropp)} invägningar senaste 120 dagarna)")
 
     lines.append("\nPERSONLIGA REKORD:")
     for row in pr:
@@ -206,8 +262,13 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     lines.append(f"\nVECKOSAMMANFATTNING (senaste {veckor} veckor):")
     for vecka in sorted(veckor_data.keys(), reverse=True):
         v = veckor_data[vecka]
-        typer = ", ".join(sorted(v["typer"]))
-        lines.append(f"  {vecka}: {len(v['pass'])} pass | {round(v['km'],1)} km | {typer}")
+        typer = ", ".join(f"{t} {round(m)} min" for t, m in sorted(v["typer"].items(), key=lambda x: -x[1]))
+        lines.append(f"  {vecka}: {len(v['pass'])} pass | {round(v['min'])} min totalt | löpning {round(v['löp_km'],1)} km | {typer}")
+
+    lines.append("\nÖVRIGA PASS (ej löpning, senaste):")
+    for datum, label, minuter, puls, km in övriga_pass:
+        km_txt = f" | {km} km" if km and km >= 1 else ""
+        lines.append(f"  {datum} | {label} | {round(minuter or 0)} min | puls {puls or '-'}{km_txt}")
 
     lines.append(f"\nSENASTE LÖPPASS:")
     for row in löppass[:20]:
@@ -228,10 +289,64 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     for row in hälsa:
         lines.append(f"  {row[0]} | vilopuls: {row[1]} | BB: {row[2]}/{row[3]} | stress: {row[4]} | steg: {row[5]}")
 
-    lines.append(f"\nSÖMN SENASTE 14 DAGAR:")
+    idag_str = datetime.now().strftime("%Y-%m-%d")
+
+    def tim(minuter):
+        if minuter is None:
+            return "-"
+        return f"{int(minuter // 60)}h{int(minuter % 60):02d}m"
+
+    lines.append("\nÅTERHÄMTNING (training readiness och HRV):")
+    if readiness:
+        r = readiness[0]
+        tidpunkt = (r[12] or "")[11:16]
+        if r[0] == idag_str:
+            lines.append(f"  Training Readiness IDAG ({r[0]}, uppdaterad {tidpunkt}): {r[1]}/100 {r[2]} ({r[3]})")
+        else:
+            lines.append(f"  Ingen readiness för idag ännu. Senaste: {r[0]} — {r[1]}/100 {r[2]} ({r[3]})")
+        återh_h = f" (kvar {round(r[7] / 60, 1)} h)" if r[7] is not None else ""
+        lines.append(f"    Faktorer: sömn {r[4]}% | sömnhistorik {r[5]}% | återhämtningstid {r[6]}%{återh_h} | "
+                     f"belastning/ACWR {r[8]}% (akut belastning {r[9]}) | stresshistorik {r[10]}% | HRV {r[11]}%")
+        if len(readiness) > 1:
+            lines.append("    Trend: " + ", ".join(f"{x[0][5:]}: {x[1]}" for x in reversed(readiness)))
+    else:
+        lines.append("  Ingen training readiness tillgänglig (enheten stödjer det troligen inte)")
+
+    hrv_nätter = [row for row in sömn if row[8] is not None]
+    if hrv_nätter:
+        h = hrv_nätter[0]
+        # Garmin jämför 7-dagarssnittet (inte enskild natt) mot baslinjen — gör likadant
+        if h[10] is not None and h[11] is not None and h[12] is not None:
+            if h[10] < h[11]:
+                läge = "UNDER"
+            elif h[10] > h[12]:
+                läge = "ÖVER"
+            else:
+                läge = "inom"
+            lines.append(f"  HRV 7-dagarssnitt: {int(h[10])} ms → {läge} personlig baslinje {int(h[11])}–{int(h[12])} | status {h[9]}")
+        else:
+            lines.append(f"  HRV-status: {h[9]} (baslinje saknas — Garmin behöver ~3 veckors data)")
+        jämfört = ""
+        if h[10]:
+            diff = round((h[8] - h[10]) / h[10] * 100)
+            jämfört = f" ({'+' if diff >= 0 else ''}{diff}% mot 7-dagarssnittet)"
+        lines.append(f"  HRV senaste natten ({h[0]}): {int(h[8])} ms{jämfört} — enskilda nätter varierar, väg in trenden")
+        lines.append("    HRV per natt: " + ", ".join(f"{x[0][5:]}: {int(x[8])}" for x in reversed(hrv_nätter[:7])))
+    else:
+        lines.append("  Ingen HRV-data — enheten stödjer troligen inte HRV-status. Bedöm återhämtning via sömn, vilopuls och Body Battery.")
+
+    lines.append(f"\nSÖMN SENASTE 14 NÄTTER (datum = morgonen natten slutade):")
     if sömn:
         for row in sömn:
-            lines.append(f"  {row[0]} | total: {row[1]} min | djup: {row[2]} min | lätt: {row[3]} min | vaken: {row[4]} min")
+            delar = [f"  {row[0]} | {tim(row[1])}"]
+            if row[6] is not None:
+                delar.append(f"poäng {row[6]} ({row[7]})")
+            delar.append(f"djup {tim(row[2])} | REM {tim(row[5])} | lätt {tim(row[3])} | vaken {tim(row[4])}")
+            if row[13] is not None:
+                delar.append(f"vilopuls {row[13]}")
+            if row[14] is not None:
+                delar.append(f"BB-laddning +{row[14]}")
+            lines.append(" | ".join(delar))
     else:
         lines.append("  Ingen bekräftad sömndata tillgänglig")
 

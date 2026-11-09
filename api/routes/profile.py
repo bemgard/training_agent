@@ -3,15 +3,20 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from api.database import get_db, USE_SQLITE
 from api.routes.auth import verifiera_token
+from pydantic import BaseModel
+from typing import Optional
+from scripts.aktivitetstyp import effektiv_typ, KATEGORIER
 
 router = APIRouter()
 ph = "?" if USE_SQLITE else "%s"
 
-def classify_activity(typ, plats, distans_km):
-    plats = (plats or "").lower()
-    if "täby" in plats and typ in ("running", "treadmill_running") and (distans_km or 0) < 10:
-        return "football"
-    return typ
+def med_kategori(rad):
+    """Lägger till kategori/gissad (gemensam logik med coachen, se scripts/aktivitetstyp.py)."""
+    d = dict(rad)
+    d["kategori"], d["gissad"] = effektiv_typ(
+        d.get("typ"), d.get("plats"), d.get("distans_km"),
+        d.get("duration_min"), d.get("snitt_puls"), d.get("typ_manuell"))
+    return d
 
 def get_current_user(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -25,33 +30,26 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
     user_id = user["user_id"]
 
     c.execute(f"""
-        SELECT datum, namn, typ, distans_km, duration_min, snitt_puls, snitt_tempo, plats
+        SELECT activity_id, datum, namn, typ, typ_manuell, distans_km, duration_min,
+               snitt_puls, snitt_tempo, plats
         FROM activities
         WHERE typ NOT IN ('golf') AND user_id = {ph}
-        ORDER BY datum DESC
+        ORDER BY datum DESC, activity_id DESC
         LIMIT 10
     """, (user_id,))
-    aktiviteter = c.fetchall()
-    result = []
-    for a in aktiviteter:
-        d = dict(a)
-        d["typ"] = classify_activity(d["typ"], d.get("plats"), d.get("distans_km"))
-        result.append(d)
+    result = [med_kategori(a) for a in c.fetchall()]
 
-    sju_dagar = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    måndag = (datetime.now() - timedelta(days=datetime.now().weekday())).strftime("%Y-%m-%d")
     c.execute(f"""
-        SELECT datum, typ, distans_km, duration_min, snitt_puls, plats
+        SELECT activity_id, datum, namn, typ, typ_manuell, distans_km, duration_min, snitt_puls, plats
         FROM activities
         WHERE datum >= {ph} AND user_id = {ph}
         ORDER BY datum ASC
-    """, (sju_dagar, user_id))
-    veckans = c.fetchall()
+    """, (måndag, user_id))
+    veckans = [med_kategori(a) for a in c.fetchall()]
 
     c.execute(f"SELECT langd_cm, vikt_kg, vo2max FROM user_profile WHERE id = {ph} LIMIT 1", (user_id,))
     profil = c.fetchone()
-    if not profil:
-        c.execute("SELECT langd_cm, vikt_kg, vo2max FROM user_profile LIMIT 1")
-        profil = c.fetchone()
 
     c.execute(f"""
         SELECT typ, formaterat, datum FROM personal_records
@@ -72,11 +70,28 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
     vo2 = c.fetchone()
 
     c.execute(f"""
-        SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min
+        SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min,
+               rem_sov_min, somnpoang, somn_kvalitet
         FROM sleep_daily WHERE user_id = {ph}
         ORDER BY datum DESC LIMIT 7
     """, (user_id,))
     sömn_dagar = c.fetchall()
+
+    c.execute(f"""
+        SELECT datum, poang, niva, feedback, somn_faktor, somnhistorik_faktor,
+               aterhamtning_faktor, aterhamtning_min, belastning_faktor, akut_belastning,
+               stress_faktor, hrv_faktor, uppdaterad
+        FROM readiness_daily WHERE user_id = {ph}
+        ORDER BY datum DESC LIMIT 7
+    """, (user_id,))
+    readiness = c.fetchall()
+
+    c.execute(f"""
+        SELECT datum, hrv_natt, hrv_7d, hrv_baslinje_lag, hrv_baslinje_hog, hrv_status
+        FROM sleep_daily WHERE user_id = {ph} AND hrv_natt IS NOT NULL
+        ORDER BY datum DESC LIMIT 14
+    """, (user_id,))
+    hrv = c.fetchall()
 
     c.execute(f"""
         SELECT time_5k, time_10k, time_half, time_marathon, datum
@@ -112,8 +127,33 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
         "hälsodata": [dict(h) for h in hälsa],
         "veckosammanfattning": veckor,
         "aktiviteter": result,
-        "veckans_aktiviteter": [dict(v) for v in veckans],
+        "veckans_aktiviteter": veckans,
+        "veckans_start": måndag,
         "sömn": dict(sömn_dagar[0]) if sömn_dagar else {},
         "sömn_vecka": [dict(s) for s in sömn_dagar],
-        "race_predictions": dict(predictions) if predictions else {}
+        "race_predictions": dict(predictions) if predictions else {},
+        "readiness": [dict(r) for r in readiness],
+        "hrv": [dict(h) for h in hrv],
     }
+
+class TypRequest(BaseModel):
+    typ: Optional[str] = None  # None = återställ till Garmins/automatisk typ
+
+
+@router.get("/aktivitetstyper")
+def get_aktivitetstyper():
+    return KATEGORIER
+
+
+@router.patch("/activities/{activity_id}/typ")
+def set_aktivitetstyp(activity_id: int, req: TypRequest, db=Depends(get_db), user=Depends(get_current_user)):
+    if req.typ is not None and req.typ not in KATEGORIER:
+        raise HTTPException(status_code=400, detail="Okänd aktivitetstyp")
+    c = db.cursor()
+    c.execute(
+        f"UPDATE activities SET typ_manuell = {ph} WHERE activity_id = {ph} AND user_id = {ph}",
+        (req.typ, activity_id, user["user_id"]))
+    if c.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Aktiviteten hittades inte")
+    db.commit()
+    return {"ok": True, "typ": req.typ}
