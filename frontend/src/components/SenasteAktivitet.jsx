@@ -1,17 +1,9 @@
 import { Navigation } from "lucide-react"
+import { kategoriInfo } from "../aktivitetstyper"
 
 function formatDuration(min) {
   if (!min) return "—"
   return `${Math.floor(min / 60)}:${String(Math.round(min % 60)).padStart(2, "0")}`
-}
-
-function aktivitetIkon(typ) {
-  if (typ === "running" || typ === "treadmill_running") return "🏃"
-  if (typ === "football") return "⚽"
-  if (typ === "hiit") return "💪"
-  if (typ === "skiing" || typ === "cross_country_skiing_ws") return "⛷️"
-  if (typ === "cardio" || typ === "indoor_cardio") return "🚴"
-  return "🏋️"
 }
 
 function PulsKurva({ puls }) {
@@ -73,7 +65,7 @@ export default function SenasteAktivitet({ aktiviteter }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12,
           color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>
           <Navigation size={14} color="#f97316" />
-          Senaste aktivitet · {a.namn || a.typ}
+          Senaste aktivitet · {a.namn || kategoriInfo(a.kategori).namn}
         </div>
         {a.plats && (
           <div style={{ fontSize: 11, color: "#475569" }}>📍 {a.plats}</div>
@@ -97,7 +89,7 @@ export default function SenasteAktivitet({ aktiviteter }) {
 
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>
-            {aktivitetIkon(a.typ)} Pulsprofil
+            {kategoriInfo(a.kategori).ikon} Pulsprofil
           </div>
           <PulsKurva puls={a.snitt_puls} />
           {a.snitt_puls && (

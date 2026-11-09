@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react"
-import { fetchProfile, streamChat } from "./api"
+import { fetchProfile } from "./api"
 import Header from "./components/Header"
 import Dashboard from "./components/Dashboard"
 import Chat from "./components/Chat"
 import Login from "./components/Login"
+import TraningsPlan from "./components/TraningsPlan"
+import Trender from "./components/Trender"
 
 export default function App() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("dashboard")
+  const [chatInitialInput, setChatInitialInput] = useState("")
   const [token, setToken] = useState(localStorage.getItem("token"))
 
   useEffect(() => {
@@ -23,6 +26,10 @@ export default function App() {
       })
       .catch(() => setLoading(false))
   }, [token])
+
+  function uppdateraProfil() {
+    return fetchProfile().then(setProfile)
+  }
 
   function onLogin(token) {
     setToken(token)
@@ -61,13 +68,20 @@ export default function App() {
       <Header activeTab={activeTab} setActiveTab={setActiveTab} profile={profile} onLogout={onLogout} />
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px" }}>
         {activeTab === "dashboard" && (
-          <Dashboard profile={profile} onOpenChat={() => setActiveTab("chat")} />
+          <Dashboard profile={profile} onOpenChat={() => setActiveTab("chat")} onUppdatera={uppdateraProfil} />
         )}
-        {activeTab === "chat" && <Chat />}
-        {activeTab === "log" && (
-          <div style={{ color: "#64748b", textAlign: "center", marginTop: 80 }}>
-            Träningslogg kommer snart
-          </div>
+        {activeTab === "trender" && <Trender />}
+        {activeTab === "chat" && (
+          <Chat
+            initialInput={chatInitialInput}
+            onInitialInputConsumed={() => setChatInitialInput("")}
+          />
+        )}
+        {activeTab === "plan" && (
+          <TraningsPlan onChatWithGoal={(msg) => {
+            setChatInitialInput(msg)
+            setActiveTab("chat")
+          }} />
         )}
       </div>
     </div>

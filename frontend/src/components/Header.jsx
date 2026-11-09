@@ -20,8 +20,9 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
 
   const tabs = [
     { id: "dashboard", label: "Översikt" },
+    { id: "trender", label: "Trender" },
     { id: "chat", label: "AI-Coach" },
-    { id: "log", label: "Träningslogg" },
+    { id: "plan", label: "Träningsplan" },
   ]
 
   async function triggerSync() {

@@ -5,6 +5,11 @@ import PRCard from "./PRCard"
 import SleepChart from "./SleepChart"
 import WeeklyLoad from "./WeeklyLoad"
 import ActivityLog from "./ActivityLog"
+import ReadinessCard from "./ReadinessCard"
+import HRVCard from "./HRVCard"
+import KroppSektion from "./KroppSektion"
+import SomnDetalj from "./SomnDetalj"
+import { useState } from "react"
 
 function getTrainingStatus(hälsa, veckor) {
   const bb = hälsa[0]?.body_battery_hogst
@@ -19,7 +24,8 @@ function getTrainingStatus(hälsa, veckor) {
   return { label: "Återhämtning", color: "#a78bfa", delta: belastningDelta }
 }
 
-export default function Dashboard({ profile, aiSummary, onOpenChat }) {
+export default function Dashboard({ profile, aiSummary, onOpenChat, onUppdatera }) {
+  const [visaSömn, setVisaSömn] = useState(false)
   const hälsa = profile?.hälsodata || []
   const veckor = profile?.veckosammanfattning || []
   const hälsaMedData = hälsa.filter(d => d.body_battery_hogst)
@@ -41,6 +47,11 @@ export default function Dashboard({ profile, aiSummary, onOpenChat }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <ReadinessCard readiness={profile?.readiness} />
+        <HRVCard hrv={profile?.hrv} />
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
         <KPICard
           icon={Activity}
@@ -86,14 +97,17 @@ export default function Dashboard({ profile, aiSummary, onOpenChat }) {
         />
       </div>
 
+      <KroppSektion />
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <SenasteAktivitet aktiviteter={profile?.aktiviteter} />
         <PRCard records={profile?.personliga_rekord || []} profile={profile} />
       </div>
 
-      <SleepChart sömnVecka={profile?.sömn_vecka || []} />
-      <WeeklyLoad aktiviteter={profile?.aktiviteter} />
-      <ActivityLog aktiviteter={profile?.aktiviteter} />
+      <SleepChart sömnVecka={profile?.sömn_vecka || []} onClick={() => setVisaSömn(true)} />
+      {visaSömn && <SomnDetalj onStäng={() => setVisaSömn(false)} />}
+      <WeeklyLoad aktiviteter={profile?.veckans_aktiviteter} veckansStart={profile?.veckans_start} />
+      <ActivityLog aktiviteter={profile?.aktiviteter} onUppdatera={onUppdatera} />
 
       {aiSummary && (
         <div style={{
