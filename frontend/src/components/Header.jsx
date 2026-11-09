@@ -13,10 +13,19 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
   const [synkar, setSynkar] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null)
 
-  const senastSync = profile?.hälsodata?.[0]?.datum
-  const syncText = senastSync
-    ? new Date(senastSync + "T12:00:00").toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" })
-    : null
+  // Senaste synk från sync_log (faktisk tidpunkt + om den lyckades), inte senaste datadatum
+  const senaste = profile?.senaste_synk
+  let syncText = null
+  if (senaste?.slut) {
+    const t = new Date(senaste.slut)
+    const idag = new Date().toDateString() === t.toDateString()
+    const dag = idag ? "idag" : t.toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" })
+    const kl = t.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })
+    syncText = `${senaste.ok ? "Synkad" : "Synk misslyckades"} ${dag} ${kl}${senaste.kalla === "schema" ? " (auto)" : ""}`
+  }
+  const syncOk = senaste?.ok !== false
+  const timme = new Date().getHours()
+  const hälsning = timme < 10 ? "God morgon" : timme < 17 ? "Hej" : "God kväll"
 
   const tabs = [
     { id: "dashboard", label: "Översikt" },
@@ -58,15 +67,15 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
           <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" }}>
-            God morgon 👋
+            {hälsning} 👋
           </div>
           {syncText && (
             <div style={{ fontSize: 11, color: colors.muted, display: "flex", alignItems: "center", gap: 4 }}>
               <span style={{
-                width: 6, height: 6, borderRadius: "50%", background: colors.accent,
+                width: 6, height: 6, borderRadius: "50%", background: syncOk ? colors.accent : "#f87171",
                 display: "inline-block", flexShrink: 0,
               }} />
-              Synkad {syncText}
+              <span style={{ color: syncOk ? undefined : "#f87171" }}>{syncText}</span>
             </div>
           )}
         </div>

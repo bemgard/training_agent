@@ -94,6 +94,10 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
     alla_pass = [dict(r) for r in c.fetchall()]
     belastning_serie = daglig_serie(alla_pass, maxpuls(alla_pass))[-28:]
 
+    c.execute(f"""SELECT start, slut, ok, kalla FROM sync_log
+                  WHERE user_id = {ph} AND slut IS NOT NULL ORDER BY start DESC LIMIT 1""", (user_id,))
+    senaste_synk = c.fetchone()
+
     c.execute(f"""
         SELECT datum, hrv_natt, hrv_7d, hrv_baslinje_lag, hrv_baslinje_hog, hrv_status
         FROM sleep_daily WHERE user_id = {ph} AND hrv_natt IS NOT NULL
@@ -143,6 +147,7 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
         "readiness": [dict(r) for r in readiness],
         "hrv": [dict(h) for h in hrv],
         "belastning": belastning_serie,
+        "senaste_synk": {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in dict(senaste_synk).items()} if senaste_synk else None,
     }
 
 class TypRequest(BaseModel):

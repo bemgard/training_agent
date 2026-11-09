@@ -120,7 +120,7 @@ def sync(full_sync=False):
     user_id = os.getenv("SYNC_USER_ID")
     if not user_id:
         print("❌ SYNC_USER_ID saknas")
-        return
+        sys.exit(1)
     user_id = int(user_id)
 
     email = os.getenv("GARMIN_EMAIL")
@@ -128,7 +128,7 @@ def sync(full_sync=False):
 
     if not email or not password:
         print("❌ GARMIN_EMAIL och GARMIN_PASSWORD saknas")
-        return
+        sys.exit(1)
 
     conn = get_conn()
     c = conn.cursor()
