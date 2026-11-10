@@ -72,7 +72,7 @@ export default function App() {
       color: "#e2e8f0"
     }}>
       <Header activeTab={activeTab} setActiveTab={setActiveTab} profile={profile} onLogout={onLogout} />
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px" }}>
+      <div className="app-innehall" style={{ maxWidth: 1200, margin: "0 auto", padding: "32px" }}>
         {activeTab === "dashboard" && (
           <Dashboard profile={profile} onOpenChat={() => setActiveTab("chat")} onUppdatera={uppdateraProfil} />
         )}

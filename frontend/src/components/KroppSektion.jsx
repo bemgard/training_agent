@@ -133,7 +133,7 @@ function ProfilFormulär({ profil, onSparat }) {
     onSparat()
   }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
+    <div className="m-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
       <label style={{ fontSize: 11, color: "#64748b" }}>Längd (cm)<input style={inputStil} type="number" value={langd} onChange={e => setLangd(e.target.value)} /></label>
       <label style={{ fontSize: 11, color: "#64748b" }}>Födelseår<input style={inputStil} type="number" value={år} onChange={e => setÅr(e.target.value)} /></label>
       <label style={{ fontSize: 11, color: "#64748b" }}>Kön
@@ -160,7 +160,7 @@ function InvägningFormulär({ onSparat, onAvbryt }) {
     onSparat()
   }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto auto", gap: 10, alignItems: "end" }}>
+    <div className="m-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto auto", gap: 10, alignItems: "end" }}>
       <label style={{ fontSize: 11, color: "#64748b" }}>Datum<input style={inputStil} type="date" value={datum} onChange={e => setDatum(e.target.value)} /></label>
       <label style={{ fontSize: 11, color: "#64748b" }}>Vikt (kg)*<input style={inputStil} inputMode="decimal" autoFocus value={vikt} onChange={e => setVikt(e.target.value)} /></label>
       <label style={{ fontSize: 11, color: "#64748b" }}>Fett % (smartvåg)<input style={inputStil} inputMode="decimal" placeholder="valfritt" value={fett} onChange={e => setFett(e.target.value)} /></label>
@@ -235,7 +235,7 @@ export default function KroppSektion() {
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
             {kort.map(k => (
               <Kort key={k.nyckel} mått={k.mått} värde={k.värde} sub={k.sub}
                 vald={vald === k.nyckel} onClick={() => setVald(vald === k.nyckel ? null : k.nyckel)} />

@@ -8,3 +8,8 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+// Installerbar app (Lägg till på hemskärmen). Bara i produktion så att Vite-utvecklingen inte påverkas.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}))
+}

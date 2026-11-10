@@ -72,7 +72,7 @@ export default function SenasteAktivitet({ aktiviteter }) {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 24 }}>
+      <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 24 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {stats.map(({ label, value, unit }) => (
             <div key={label} style={{ borderBottom: "1px solid #1e2736", paddingBottom: 12 }}>

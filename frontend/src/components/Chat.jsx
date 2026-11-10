@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react"
-import { Send, Plus, Trash2 } from "lucide-react"
+import { Send, Plus, Trash2, Menu, X } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import { streamChat, skapaSamtal, fetchSamtalLista, fetchSamtal, taBortSamtal, sparaPlan } from "../api"
 import { lokaltDatum } from "../aktivitetstyper"
@@ -127,9 +127,10 @@ function relativtDatum(iso) {
   return d.toLocaleDateString("sv-SE", { day: "numeric", month: "short" })
 }
 
-function SamtalsLista({ lista, aktivt, onVälj, onNytt, onTaBort }) {
+function SamtalsLista({ lista, aktivt, onVälj, onNytt, onTaBort, öppen, onStäng }) {
   return (
-    <div style={{ width: 230, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, borderRight: "1px solid #2a2a3a", paddingRight: 16, overflowY: "auto" }}>
+    <div className={`chat-lista${öppen ? " oppen" : ""}`} style={{ width: 230, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, borderRight: "1px solid #2a2a3a", paddingRight: 16, overflowY: "auto" }}>
+      <button className="d-dolj flex" onClick={onStäng} style={{ alignSelf: "flex-end", background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 4 }}><X size={20} /></button>
       <button onClick={onNytt} style={{
         background: "#1a3a2e", border: "1px solid #6ee7b760", color: "#6ee7b7", borderRadius: 10, padding: "9px 12px",
         cursor: "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8,
@@ -158,6 +159,7 @@ export default function Chat({ initialInput = "", onInitialInputConsumed }) {
   const [streaming, setStreaming] = useState(false)
   const [samtalId, setSamtalId] = useState(null)
   const [lista, setLista] = useState([])
+  const [menyÖppen, setMenyÖppen] = useState(false)
   const chatEndRef = useRef(null)
 
   const laddaLista = () => fetchSamtalLista().then(setLista)
@@ -239,9 +241,19 @@ export default function Chat({ initialInput = "", onInitialInputConsumed }) {
   return (
     <>
     <style>{RUNNER_CSS}</style>
-    <div style={{ display: "flex", gap: 20, height: "calc(100vh - 180px)" }}>
-    <SamtalsLista lista={lista} aktivt={samtalId} onVälj={väljSamtal} onNytt={nyttSamtal} onTaBort={taBort} />
+    <div className="chat-ram" style={{ display: "flex", gap: 20, height: "calc(100vh - 180px)" }}>
+    <SamtalsLista lista={lista} aktivt={samtalId} öppen={menyÖppen} onStäng={() => setMenyÖppen(false)}
+      onVälj={id => { setMenyÖppen(false); väljSamtal(id) }} onNytt={() => { setMenyÖppen(false); nyttSamtal() }} onTaBort={taBort} />
     <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+      <div className="d-dolj flex" style={{ alignItems: "center", gap: 10, paddingBottom: 10, borderBottom: "1px solid #2a2a3a", marginBottom: 10 }}>
+        <button onClick={() => setMenyÖppen(true)} style={{ background: "none", border: "1px solid #2a2a3a", color: "#94a3b8", borderRadius: 8, padding: "6px 10px", display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+          <Menu size={16} /> Samtal
+        </button>
+        <span style={{ flex: 1, fontSize: 13, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {lista.find(x => x.id === samtalId)?.titel || "Nytt samtal"}
+        </span>
+        {samtalId && <button onClick={nyttSamtal} style={{ background: "none", border: "none", color: "#6ee7b7", display: "flex", alignItems: "center" }} title="Nytt samtal"><Plus size={20} /></button>}
+      </div>
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: 16 }}>
         {messages.length === 0 && (
           <div style={{ textAlign: "center", color: "#64748b", marginTop: 80 }}>

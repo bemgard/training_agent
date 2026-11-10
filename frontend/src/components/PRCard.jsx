@@ -37,7 +37,7 @@ records.forEach(r => { prMap[r.typ] = r.formaterat })
   ]
 
   return (
-    <div style={{
+    <div className="m-stack" style={{
       background: "#1a1a26",
       border: "1px solid #2a2a3a",
       borderRadius: 12,

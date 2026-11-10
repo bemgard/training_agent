@@ -218,7 +218,7 @@ function Nyckeltal({ punkter, format, lägreÄrBättre, enhet }) {
       sub: "första → senaste", färg: förändring ? (bra ? "#6ee7b7" : "#fb923c") : undefined },
   ]
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 18 }}>
+    <div className="m-3" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 18 }}>
       {rutor.map(r => (
         <div key={r.namn} style={{ background: "#12161f", border: "1px solid #1e2736", borderRadius: 8, padding: "10px 12px" }}>
           <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em" }}>{r.namn}</div>
@@ -266,8 +266,8 @@ function Detaljvy({ graf, från, till, onStäng }) {
   }, [onStäng])
   const Ikon = graf.ikon
   return (
-    <div onClick={onStäng} style={{ position: "fixed", inset: 0, background: "#000000b0", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#161b25", border: "1px solid #2a3446", borderRadius: 12, padding: "22px 26px", width: "min(1100px, 100%)", maxHeight: "100%", overflowY: "auto" }}>
+    <div onClick={onStäng} className="m-modal-bakgrund" style={{ position: "fixed", inset: 0, background: "#000000b0", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
+      <div onClick={e => e.stopPropagation()} className="m-modal" style={{ background: "#161b25", border: "1px solid #2a3446", borderRadius: 12, padding: "22px 26px", width: "min(1100px, 100%)", maxHeight: "100%", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>
             <Ikon size={18} color={graf.färg} /> {graf.titel}
@@ -281,7 +281,7 @@ function Detaljvy({ graf, från, till, onStäng }) {
           : <TidsGraf {...graf.graf} från={från} till={till} färg={graf.färg} höjd={340} detalj enhet={graf.enhetKort} />}
         <Legend poster={graf.legend} />
         {graf.förklaring && <div style={{ fontSize: 11, color: "#64748b", marginTop: 12 }}>{graf.förklaring}</div>}
-        {!graf.volym && <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Håll muspekaren över grafen för exakta värden.</div>}
+        {!graf.volym && <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Peka eller tryck på grafen för exakta värden.</div>}
       </div>
     </div>
   )
@@ -396,7 +396,7 @@ function byggGrafer(data) {
       nyckeltal: { punkter: data.volym.map(v => ({ datum: v.vecka, v: v.totalt })), format: timmar, enhet: "/vecka" },
       legend: [...new Set(data.volym.flatMap(v => Object.keys(v.per_kategori)))]
         .map(k => ({ namn: kategoriInfo(k === "oklassad" ? null : k).namn, färg: kategoriInfo(k === "oklassad" ? null : k).färg })),
-      förklaring: "Håll muspekaren över en stapel för att se veckans fördelning per passtyp.",
+      förklaring: "Peka eller tryck på en stapel för att se veckans fördelning per passtyp.",
     },
   ]
 }
@@ -421,7 +421,7 @@ export default function Trender() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#f1f5f9" }}>Trender</div>
           <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
@@ -432,13 +432,13 @@ export default function Trender() {
           {INTERVALL.map(iv => (
             <button key={iv.namn} onClick={() => { setLaddar(true); setIntervall(iv) }} style={{
               background: iv === intervall ? "#1e2736" : "transparent", color: iv === intervall ? "#f1f5f9" : "#64748b",
-              border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer",
+              border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
             }}>{iv.namn}</button>
           ))}
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {grafer.map(g => (
           <Kort key={g.nyckel} ikon={g.ikon} titel={g.titel} färg={g.färg} värde={g.värde} enhet={g.enhet} sub={g.sub}
             onClick={() => setÖppen(g.nyckel)}>

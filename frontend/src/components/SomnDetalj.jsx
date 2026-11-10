@@ -217,7 +217,7 @@ export default function SomnDetalj({ onStäng }) {
     const snittPoäng = medel(nätter.map(n => n.somnpoang))
     innehåll = (
       <>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 18 }}>
+        <div className="m-3" style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10, marginBottom: 18 }}>
           <Ruta namn="Snitt sömn" värde={tidText(medel(nätter.map(n => n.sovtid_min)))} sub={`${nätter.length} nätter`} />
           <Ruta namn="Snitt poäng" värde={snittPoäng != null ? Math.round(snittPoäng) : "—"} färg={poängFärg(snittPoäng)} sub="sömnpoäng" />
           <Ruta namn="Djupsömn" värde={tidText(medel(nätter.map(n => n.djup_sov_min)))} sub={`${andel("djup_sov_min")}% av sömnen`} />
@@ -233,10 +233,10 @@ export default function SomnDetalj({ onStäng }) {
               <span style={{ width: 10, height: 10, borderRadius: 2, background: f.färg }} />{f.namn}
             </span>
           ))}
-          <span style={{ fontSize: 11, color: "#475569", marginLeft: "auto" }}>Håll muspekaren över en natt för detaljer · streckad linje = snitt</span>
+          <span style={{ fontSize: 11, color: "#475569", marginLeft: "auto" }}>Peka eller tryck på en natt för detaljer · streckad linje = snitt</span>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
+        <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
           <div>
             <Rubrik>Sömnfaser i snitt</Rubrik>
             <Fördelning nätter={nätter} />
@@ -255,8 +255,8 @@ export default function SomnDetalj({ onStäng }) {
   }
 
   return (
-    <div onClick={onStäng} style={{ position: "fixed", inset: 0, background: "#000000b0", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#161b25", border: "1px solid #2a3446", borderRadius: 12, padding: "22px 26px", width: "min(1100px, 100%)", maxHeight: "100%", overflowY: "auto" }}>
+    <div onClick={onStäng} className="m-modal-bakgrund" style={{ position: "fixed", inset: 0, background: "#000000b0", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
+      <div onClick={e => e.stopPropagation()} className="m-modal" style={{ background: "#161b25", border: "1px solid #2a3446", borderRadius: 12, padding: "22px 26px", width: "min(1100px, 100%)", maxHeight: "100%", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>
             <Moon size={18} color="#a78bfa" /> Sömn

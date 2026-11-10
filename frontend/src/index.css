@@ -5,3 +5,54 @@ body { background: #0a0a0f; }
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+/* ── Mobil (≤ 700 px) ───────────────────────────────────────────────────────
+   Komponenterna använder inline-stilar; klasserna nedan skriver över layouten på smala skärmar
+   (!important vinner över inline-stil). Desktop påverkas inte. */
+.d-dolj { display: none !important; }            /* syns bara på mobil */
+
+@media (max-width: 700px) {
+  .m-stack { grid-template-columns: 1fr !important; }
+  .m-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .m-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .m-dolj { display: none !important; }
+  .d-dolj { display: revert !important; }
+  .d-dolj.flex { display: flex !important; }
+
+  .app-innehall { padding: 14px 12px calc(84px + env(safe-area-inset-bottom)) !important; }
+  .app-header { padding: max(12px, env(safe-area-inset-top)) 14px 12px !important; }
+  .app-header .halsning { font-size: 17px !important; }
+
+  .m-liten { padding: 6px 10px !important; white-space: nowrap; }
+  .m-kort { padding: 14px 14px !important; }
+  .plan-dagrad { grid-template-columns: 46px minmax(0, 1fr) !important; gap: 8px !important; }
+
+  /* Aktivitetslistan: ikon, namn och tid — distans/puls döljs */
+  .aktivitetsrad { grid-template-columns: 32px minmax(0, 1fr) auto !important; gap: 10px !important; }
+
+  /* Modaler i helskärm */
+  .m-modal-bakgrund { padding: 0 !important; align-items: stretch !important; }
+  .m-modal { width: 100% !important; max-height: 100dvh !important; border-radius: 0 !important; padding: 16px 14px calc(16px + env(safe-area-inset-bottom)) !important; border: none !important; }
+
+  /* Chatten: samtalslistan blir en utdragbar meny */
+  .chat-ram { height: calc(100dvh - 190px - env(safe-area-inset-bottom)) !important; gap: 0 !important; }
+  .chat-lista { display: none !important; }
+  .chat-lista.oppen { display: flex !important; position: fixed; inset: 0 30% 0 0; z-index: 60; background: #0f131b;
+                      padding: 16px 12px calc(16px + env(safe-area-inset-bottom)) !important; border-right: 1px solid #2a2a3a; }
+  .message-bubble { max-width: 92% !important; }
+
+  /* iPhone zoomar in i fält med mindre text än 16 px */
+  input, textarea, select { font-size: 16px !important; }
+}
+
+/* Flikrad i botten (mobil) */
+.bottennav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  background: #0f131bf5; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid #2a2a3a; padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  justify-content: space-around;
+}
+.bottennav button {
+  flex: 1; background: none; border: none; color: #64748b; font-size: 10.5px; font-weight: 600;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; cursor: pointer;
+}
+.bottennav button.aktiv { color: #6ee7b7; }

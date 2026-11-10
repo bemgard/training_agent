@@ -99,7 +99,7 @@ export default function DagsformKort({ onÄndrad }) {
       {visaFråga ? (
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 10 }}>Hur mår du idag?</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+          <div className="m-2" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
             {Object.entries(ALLMÄNT).map(([k, a]) => (
               <button key={k} onClick={() => spara({ allmant: k })} style={{
                 background: rapport.allmant === k ? a.färg + "1a" : C.bg, border: `1px solid ${rapport.allmant === k ? a.färg + "90" : C.border}`,
@@ -144,17 +144,19 @@ export default function DagsformKort({ onÄndrad }) {
 
       {(besvar.length > 0 || nyttBesvär) && <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 14, paddingTop: 10 }} />}
       {besvar.map(b => (
-        <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", fontSize: 13 }}>
+        <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", fontSize: 13, flexWrap: "wrap" }}>
           <span style={{ width: 8, height: 8, borderRadius: 999, background: TYPFÄRG[b.typ], flexShrink: 0 }} />
-          <span style={{ flex: 1, color: C.text }}>
+          <span style={{ flex: "1 1 200px", color: C.text }}>
             <b>{val.kroppsdelar[b.kroppsdel]}</b>
             <span style={{ color: C.sub }}> · {val.besvarstyp[b.typ]} · dag {b.dag} · {b.niva}/10</span>
             {b.niva !== b.niva_start && <span style={{ color: b.niva < b.niva_start ? "#6ee7b7" : "#f87171", fontSize: 12 }}> (från {b.niva_start})</span>}
             {b.dag > 7 && <span style={{ color: "#fbbf24", fontSize: 12 }}> · över en vecka — överväg fysioterapeut</span>}
           </span>
-          <button style={knapp} title="Bättre" onClick={() => ändraBesvär(b, { niva: Math.max(1, b.niva - 1) })}><TrendingDown size={13} /> Bättre</button>
-          <button style={knapp} title="Sämre" onClick={() => ändraBesvär(b, { niva: Math.min(10, b.niva + 1) })}><TrendingUp size={13} /></button>
-          <button style={knapp} onClick={() => ändraBesvär(b, { borta: true })}><Check size={13} /> Borta</button>
+          <span style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+            <button style={knapp} title="Bättre" onClick={() => ändraBesvär(b, { niva: Math.max(1, b.niva - 1) })}><TrendingDown size={13} /> Bättre</button>
+            <button style={knapp} title="Sämre" onClick={() => ändraBesvär(b, { niva: Math.min(10, b.niva + 1) })}><TrendingUp size={13} /> Sämre</button>
+            <button style={knapp} onClick={() => ändraBesvär(b, { borta: true })}><Check size={13} /> Borta</button>
+          </span>
         </div>
       ))}
       {nyttBesvär ? (

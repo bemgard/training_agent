@@ -57,7 +57,7 @@ export default function InsiktKort({ dagsformÄndrad }) {
     <>
       {data.vecka && <Veckosammanfattning v={data.vecka} />}
       {!m ? (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 20px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <Sparkles size={18} color="#a78bfa" />
           <div style={{ flex: 1, fontSize: 13, color: C.sub }}>Dagens insikt skapas efter morgonsynken 09:00. Fyll gärna i dagsformen först.</div>
           <button style={knapp} onClick={uppdatera} disabled={laddar}><RefreshCw size={13} /> {laddar ? "Coachen tänker…" : "Skapa nu"}</button>
@@ -67,7 +67,7 @@ export default function InsiktKort({ dagsformÄndrad }) {
         const r = REK[m.rekommendation] || REK.fritt
         return (
           <div style={{ background: C.surface, border: `1px solid ${r.färg}40`, borderRadius: 12, padding: "16px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <r.ikon size={15} color={r.färg} />
               <span style={{ fontSize: 11, fontWeight: 700, color: r.färg, textTransform: "uppercase", letterSpacing: "0.08em", flex: 1 }}>Dagens insikt · {r.text}</span>
               {kvar > 0 && (

@@ -67,7 +67,7 @@ function Formulär({ start, onSparat, onAvbryt }) {
     <form onSubmit={spara} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div>
         <span style={etikett}>Vad tränar du för?</span>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        <div className="m-2" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
           {Object.entries(TYPER).map(([k, t]) => (
             <button key={k} type="button" onClick={() => sätt("typ", k)} style={{
               textAlign: "left", background: m.typ === k ? t.färg + "14" : C.bg, border: `1px solid ${m.typ === k ? t.färg + "90" : C.border}`,
@@ -81,7 +81,7 @@ function Formulär({ start, onSparat, onAvbryt }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+      <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
         <label><span style={etikett}>Beskriv målet</span>
           <input style={input} value={m.titel} onChange={e => sätt("titel", e.target.value)}
             placeholder={{ grundtraning: "t.ex. Bygga volym efter fotbollssäsongen", lopp: "t.ex. Stockholm halvmaraton",
@@ -93,7 +93,7 @@ function Formulär({ start, onSparat, onAvbryt }) {
       </div>
 
       {m.typ === "lopp" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <label><span style={etikett}>Distans (km)</span>
             <input style={input} inputMode="decimal" value={m.distans_km} onChange={e => sätt("distans_km", e.target.value)} placeholder="21.1" /></label>
           <label><span style={etikett}>Måltid (valfritt)</span>
@@ -112,7 +112,7 @@ function Formulär({ start, onSparat, onAvbryt }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Räknare etikettText="Konditionspass" värde={m.kondition_per_vecka} setVärde={v => sätt("kondition_per_vecka", v)} />
         <Räknare etikettText="Styrkepass" värde={m.styrka_per_vecka} setVärde={v => sätt("styrka_per_vecka", v)} />
       </div>

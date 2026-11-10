@@ -90,7 +90,7 @@ function Veckovy({ onChatWithGoal }) {
   }
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "18px 22px", marginBottom: 28 }}>
+    <div className="m-kort" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "18px 22px", marginBottom: 28 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <CalendarDays size={18} color={C.accent} />
         <div style={{ flex: 1 }}>
@@ -105,7 +105,7 @@ function Veckovy({ onChatWithGoal }) {
       </div>
 
       {harPass && (
-        <div style={{ display: "flex", gap: 18, marginTop: 14, fontSize: 12.5, color: C.sub }}>
+        <div style={{ display: "flex", gap: "8px 18px", marginTop: 14, fontSize: 12.5, color: C.sub, flexWrap: "wrap", alignItems: "center" }}>
           <span><b style={{ color: C.accent, fontSize: 15 }}>{s.genomforda}</b> av {s.planerade} pass genomförda</span>
           {s.missade > 0 && <span style={{ color: "#f87171" }}>{s.missade} missade</span>}
           <span>Planerat {formatMinuter(s.planerad_min)} · tränat {formatMinuter(s.utford_min)}</span>
@@ -131,7 +131,7 @@ function Veckovy({ onChatWithGoal }) {
             const dag = new Date(d.datum + "T12:00:00")
             const ärIdag = d.datum === idag
             return (
-              <div key={d.datum} style={{ display: "grid", gridTemplateColumns: "76px 1fr", gap: 12, padding: "8px 0", borderTop: `1px solid ${C.border}` }}>
+              <div key={d.datum} className="plan-dagrad" style={{ display: "grid", gridTemplateColumns: "76px minmax(0, 1fr)", gap: 12, padding: "8px 0", borderTop: `1px solid ${C.border}` }}>
                 <div style={{ paddingTop: 8 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 700, color: ärIdag ? "#fbbf24" : C.text, textTransform: "capitalize" }}>{dag.toLocaleDateString("sv-SE", { weekday: "short" })}</div>
                   <div style={{ fontSize: 11, color: C.muted }}>{fmt(dag)}</div>

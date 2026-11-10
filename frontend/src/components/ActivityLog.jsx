@@ -71,7 +71,7 @@ export default function ActivityLog({ aktiviteter, onUppdatera }) {
           const info = kategoriInfo(a.kategori)
           const löpning = a.kategori === "running"
           return (
-            <div key={a.activity_id ?? i} style={{
+            <div key={a.activity_id ?? i} className="aktivitetsrad" style={{
               display: "grid", gridTemplateColumns: "32px 1fr auto auto auto", alignItems: "center",
               gap: 16, padding: "10px 0", borderBottom: i < lista.length - 1 ? "1px solid #2a2a3a" : "none",
             }}>
@@ -94,11 +94,11 @@ export default function ActivityLog({ aktiviteter, onUppdatera }) {
                 <div style={{ fontSize: 13, color: "#e2e8f0" }}>{formatMinuter(a.duration_min)}</div>
                 <div style={{ fontSize: 11, color: "#64748b" }}>tid</div>
               </div>
-              <div style={{ textAlign: "right" }}>
+              <div className="m-dolj" style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 13, color: "#e2e8f0" }}>{a.distans_km >= 0.1 ? `${a.distans_km} km` : "—"}</div>
                 <div style={{ fontSize: 11, color: "#64748b" }}>{löpning && a.snitt_tempo ? a.snitt_tempo : "distans"}</div>
               </div>
-              <div style={{ textAlign: "right" }}>
+              <div className="m-dolj" style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 13, color: "#f87171" }}>{a.snitt_puls ? `${a.snitt_puls} ♥` : "—"}</div>
                 <div style={{ fontSize: 11, color: "#64748b" }}>puls</div>
               </div>

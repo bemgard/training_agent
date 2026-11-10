@@ -1,5 +1,7 @@
 import { hämtaToken } from "./token"
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
+// Lokalt går anropen via Vites proxy (/api → localhost:8000, se vite.config.js): samma adress som sidan,
+// så det fungerar även från telefonen på samma wifi och i webbläsare som blockerar andra portar.
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "/api" : "http://localhost:8000/api")
 
 function getHeaders() {
     const token = hämtaToken()

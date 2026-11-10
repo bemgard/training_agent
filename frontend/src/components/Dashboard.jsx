@@ -45,12 +45,12 @@ export default function Dashboard({ profile, aiSummary, onOpenChat, onUppdatera 
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <InsiktKort dagsformÄndrad={dagsformÄndrad} />
       <DagsformKort onÄndrad={() => setDagsformÄndrad(true)} />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <ReadinessCard readiness={profile?.readiness} />
         <HRVCard hrv={profile?.hrv} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+      <div className="m-2" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
         <KPICard
           icon={Activity}
           label="Belastning (ACWR)"
@@ -99,7 +99,7 @@ export default function Dashboard({ profile, aiSummary, onOpenChat, onUppdatera 
 
       <KroppSektion />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <SenasteAktivitet aktiviteter={profile?.aktiviteter} />
         <PRCard records={profile?.personliga_rekord || []} profile={profile} />
       </div>

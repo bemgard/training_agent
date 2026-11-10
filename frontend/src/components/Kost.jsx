@@ -22,7 +22,7 @@ export default function Kost() {
       <div style={{ fontSize: 14, color: "#94a3b8", marginTop: 8, lineHeight: 1.6 }}>
         Vi bygger klart träning och återhämtning först. Sedan kopplar vi ihop det med vad du äter.
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 36, textAlign: "left" }}>
+      <div className="m-stack" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 36, textAlign: "left" }}>
         {KOMMANDE.map(k => (
           <div key={k.titel} style={{ background: "#161b25", border: "1px solid #1e2736", borderRadius: 10, padding: "16px 18px" }}>
             <k.ikon size={18} color={k.färg} />

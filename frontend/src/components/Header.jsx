@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { LayoutDashboard, TrendingUp, MessageCircle, CalendarDays, Salad } from "lucide-react"
 import { syncGarmin } from "../api"
 
 const colors = {
@@ -28,11 +29,11 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
   const hälsning = timme < 10 ? "God morgon" : timme < 17 ? "Hej" : "God kväll"
 
   const tabs = [
-    { id: "dashboard", label: "Översikt" },
-    { id: "trender", label: "Trender" },
-    { id: "chat", label: "AI-Coach" },
-    { id: "plan", label: "Träningsplan" },
-    { id: "kost", label: "Kost", snart: true },
+    { id: "dashboard", label: "Översikt", kort: "Översikt", ikon: LayoutDashboard },
+    { id: "trender", label: "Trender", kort: "Trender", ikon: TrendingUp },
+    { id: "chat", label: "AI-Coach", kort: "Coach", ikon: MessageCircle },
+    { id: "plan", label: "Träningsplan", kort: "Plan", ikon: CalendarDays },
+    { id: "kost", label: "Kost", kort: "Kost", ikon: Salad, snart: true },
   ]
 
   async function triggerSync() {
@@ -55,19 +56,21 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
   }
 
   return (
-    <div style={{
+    <>
+    <div className="app-header" style={{
       borderBottom: `1px solid ${colors.border}`,
       padding: "16px 32px",
       display: "flex",
       alignItems: "center",
-      justifyContent: "space-between"
+      justifyContent: "space-between",
+      gap: 12,
     }}>
-      <div>
-        <div style={{ fontSize: 11, color: colors.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+      <div style={{ minWidth: 0 }}>
+        <div className="m-dolj" style={{ fontSize: 11, color: colors.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>
           Training Agent
         </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", rowGap: 2 }}>
+          <div className="halsning" style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" }}>
             {hälsning} 👋
           </div>
           {syncText && (
@@ -82,8 +85,8 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button onClick={triggerSync} disabled={synkar} style={{
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <button className="m-liten" onClick={triggerSync} disabled={synkar} style={{
           background: "transparent",
           border: `1px solid ${colors.border}`,
           color: synkar ? colors.muted : syncStatus === "ok" ? colors.accent : syncStatus === "fel" ? "#f87171" : colors.muted,
@@ -99,7 +102,7 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
           {synkar ? "Synkar..." : syncStatus === "ok" ? "Klar!" : syncStatus === "fel" ? "Misslyckades" : "Synka"}
         </button>
 
-        <button onClick={onLogout} style={{
+        <button className="m-liten" onClick={onLogout} style={{
           background: "transparent",
           border: `1px solid ${colors.border}`,
           color: colors.muted,
@@ -111,7 +114,7 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
           Logga ut
         </button>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="m-dolj" style={{ display: "flex", gap: 8 }}>
           {tabs.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
               background: activeTab === tab.id ? colors.accentDim : "transparent",
@@ -135,5 +138,15 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
         </div>
       </div>
     </div>
+
+    <nav className="bottennav d-dolj flex">
+      {tabs.map(tab => (
+        <button key={tab.id} className={activeTab === tab.id ? "aktiv" : ""} onClick={() => { setActiveTab(tab.id); window.scrollTo(0, 0) }}>
+          <tab.ikon size={20} />
+          <span>{tab.kort}{tab.snart && <span style={{ color: "#fbbf24" }}> ·</span>}</span>
+        </button>
+      ))}
+    </nav>
+    </>
   )
 }

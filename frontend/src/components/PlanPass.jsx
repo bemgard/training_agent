@@ -76,7 +76,7 @@ export default function PlanPass({ pass, åtgärder, öppen: startÖppen = false
         {öppen ? <ChevronDown size={14} color={C.muted} /> : <ChevronRight size={14} color={C.muted} />}
         <span style={{ fontSize: 15 }}>{k.ikon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>{pass.titel || pass.typ}</div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, overflowWrap: "anywhere" }}>{pass.titel || pass.typ}</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>{målText(pass) || k.namn}</div>
         </div>
         {pass.garmin_workout_id && <span title="Ligger i Garmin-kalendern" style={{ fontSize: 11, color: "#93c5fd", flexShrink: 0 }}>⌚ I Garmin</span>}
