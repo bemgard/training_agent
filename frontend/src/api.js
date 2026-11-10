@@ -208,3 +208,13 @@ export async function uppdateraInsikt(datum) {
     const res = await fetch(`${API}/insikt/morgon`, { method: "POST", headers: getHeaders(), body: JSON.stringify({ datum }) })
     return { ok: res.ok, status: res.status, data: await res.json() }
 }
+
+export async function skickaTillGarmin(passIds, idag) {
+    const res = await fetch(`${API}/planer/garmin`, { method: "POST", headers: getHeaders(), body: JSON.stringify({ pass_ids: passIds, idag }) })
+    return { ok: res.ok, data: await res.json() }
+}
+
+export async function taBortFrånGarmin(id) {
+    const res = await fetch(`${API}/passes/${id}/garmin`, { method: "DELETE", headers: getHeaders() })
+    return { ok: res.ok }
+}

@@ -79,6 +79,7 @@ export default function PlanPass({ pass, åtgärder, öppen: startÖppen = false
           <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>{pass.titel || pass.typ}</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>{målText(pass) || k.namn}</div>
         </div>
+        {pass.garmin_workout_id && <span title="Ligger i Garmin-kalendern" style={{ fontSize: 11, color: "#93c5fd", flexShrink: 0 }}>⌚ I Garmin</span>}
         {status && (
           <span style={{ fontSize: 11, fontWeight: 600, color: status.färg, background: status.färg + "1a", border: `1px solid ${status.färg}40`, borderRadius: 999, padding: "2px 9px", flexShrink: 0 }}>
             {status.text}

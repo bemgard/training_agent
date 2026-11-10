@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
-import { ChevronLeft, ChevronRight, CalendarDays, Trash2, MessageCircle } from "lucide-react"
-import { fetchVecka, flyttaPass, deletePass } from "../api"
+import { ChevronLeft, ChevronRight, CalendarDays, Trash2, MessageCircle, Watch } from "lucide-react"
+import { fetchVecka, flyttaPass, deletePass, skickaTillGarmin, taBortFrånGarmin } from "../api"
 import { lokaltDatum, kategoriInfo, formatMinuter } from "../aktivitetstyper"
 import PlanPass from "./PlanPass"
 import MalKort from "./MalKort"
@@ -14,6 +14,33 @@ function måndag(d) {
   x.setHours(12, 0, 0, 0)
   x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
   return x
+}
+
+function GarminKnapp({ pass, idag, onÄndrat }) {
+  const [läge, setLäge] = useState("")
+  const [fel, setFel] = useState("")
+  if (!pass.kan_skickas && !pass.garmin_workout_id) return null
+  async function skicka() {
+    setLäge("skickar"); setFel("")
+    const r = await skickaTillGarmin([pass.id], idag)
+    setLäge("")
+    const res = r.data?.resultat?.[0]
+    if (!r.ok || !res?.ok) return setFel(res?.fel || r.data?.detail || "Kunde inte skicka")
+    onÄndrat()
+  }
+  return (
+    <>
+      {pass.kan_skickas && (
+        <button style={{ ...knapp, color: "#93c5fd", border: "1px solid #93c5fd50" }} onClick={skicka} disabled={läge === "skickar"}>
+          <Watch size={13} /> {läge === "skickar" ? "Skickar…" : pass.garmin_workout_id ? "Skicka igen" : "Skicka till Garmin"}
+        </button>
+      )}
+      {pass.garmin_workout_id && (
+        <button style={knapp} onClick={async () => { await taBortFrånGarmin(pass.id); onÄndrat() }}>Ta bort från Garmin</button>
+      )}
+      {fel && <span style={{ color: "#f87171", fontSize: 12 }}>{fel}</span>}
+    </>
+  )
 }
 
 function PassÅtgärder({ pass, idag, onÄndrat }) {
@@ -30,6 +57,7 @@ function PassÅtgärder({ pass, idag, onÄndrat }) {
         onÄndrat()
       }}><CalendarDays size={13} /> Flytta</button>
       <button style={knapp} onClick={async () => { await deletePass(pass.id); onÄndrat() }}><Trash2 size={13} /> Ta bort</button>
+      <GarminKnapp pass={pass} idag={idag} onÄndrat={onÄndrat} />
       {fel && <span style={{ color: "#f87171", fontSize: 12 }}>{fel}</span>}
     </div>
   )
@@ -48,6 +76,18 @@ function Veckovy({ onChatWithGoal }) {
   const ärDennaVecka = lokaltDatum(måndag(new Date())) === lokaltDatum(start)
   const s = data?.summering
   const harPass = s && s.planerade > 0
+  const oskickade = (data?.dagar || []).flatMap(d => d.pass).filter(p => p.kan_skickas && !p.garmin_workout_id)
+  const [skickar, setSkickar] = useState(false)
+  const [garminInfo, setGarminInfo] = useState("")
+  async function skickaVeckan() {
+    setSkickar(true); setGarminInfo("")
+    const r = await skickaTillGarmin(oskickade.map(p => p.id), idag)
+    setSkickar(false)
+    if (!r.ok) return setGarminInfo(r.data?.detail || "Kunde inte skicka till Garmin")
+    const lyckade = r.data.resultat.filter(x => x.ok).length
+    setGarminInfo(`${lyckade} av ${oskickade.length} pass ligger nu i Garmin-kalendern`)
+    ladda()
+  }
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "18px 22px", marginBottom: 28 }}>
@@ -69,8 +109,15 @@ function Veckovy({ onChatWithGoal }) {
           <span><b style={{ color: C.accent, fontSize: 15 }}>{s.genomforda}</b> av {s.planerade} pass genomförda</span>
           {s.missade > 0 && <span style={{ color: "#f87171" }}>{s.missade} missade</span>}
           <span>Planerat {formatMinuter(s.planerad_min)} · tränat {formatMinuter(s.utford_min)}</span>
+          <span style={{ flex: 1 }} />
+          {oskickade.length > 0 && (
+            <button style={{ ...knapp, color: "#93c5fd", border: "1px solid #93c5fd50" }} onClick={skickaVeckan} disabled={skickar}>
+              <Watch size={13} /> {skickar ? "Skickar…" : `Skicka ${oskickade.length} pass till Garmin`}
+            </button>
+          )}
         </div>
       )}
+      {garminInfo && <div style={{ fontSize: 12, color: "#93c5fd", marginTop: 6, textAlign: "right" }}>{garminInfo}</div>}
 
       {!data ? null : !harPass && data.dagar.every(d => d.ovriga.length === 0) ? (
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, padding: "14px 16px", background: "#0f131b", borderRadius: 10 }}>

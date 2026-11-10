@@ -434,6 +434,92 @@ def test_insiktsfel_faller_inte_synken(monkeypatch, capsys):
     assert "INSIKT FEL" in capsys.readouterr().out
 
 
+def test_pass_till_garmin(anv, monkeypatch):
+    from contextlib import contextmanager
+    from api.routes import passes as passes_route
+    logg = {"inloggningar": 0, "upp": [], "schema": [], "bort": [], "städa": []}
+
+    class FalskGarmin:
+        def upload_workout(self, w):
+            logg["upp"].append(w)
+            return {"workoutId": 5000 + len(logg["upp"])}
+        def schedule_workout(self, wid, datum):
+            logg["schema"].append((wid, datum))
+            return {"workoutScheduleId": 9000 + len(logg["schema"])}
+        def delete_workout(self, wid):
+            logg["bort"].append(wid)
+
+    @contextmanager
+    def falsk_inloggning(uid):
+        logg["inloggningar"] += 1
+        yield FalskGarmin()
+
+    monkeypatch.setattr(passes_route.garmin_klient, "inloggad", falsk_inloggning)
+    monkeypatch.setattr(passes_route, "_städa_garmin", lambda uid, ids: logg["städa"].append([i for i in ids if i]))
+
+    idag_d = datetime.datetime.now(datetime.timezone.utc).date()
+    idag = idag_d.isoformat()
+    start = idag_d + datetime.timedelta(days=7 - idag_d.weekday())   # nästa måndag
+    plan = {"titel": "Garminvecka", "pass": [
+        {"datum": start.isoformat(), "kategori": "running", "titel": "Intervaller",
+         "steg": [{"typ": "uppvarmning", "min": 10, "zon": "zon 2"}, {"typ": "intervall", "antal": 4, "min": 4, "zon": "zon 4", "vila_min": 2}]},
+        {"datum": (start + datetime.timedelta(days=1)).isoformat(), "kategori": "strength_training", "titel": "Styrka",
+         "ovningar": [{"namn": "Knäböj", "set": 3, "reps": "8"}]},
+        {"datum": (start + datetime.timedelta(days=2)).isoformat(), "kategori": "football", "titel": "Fotboll"}]}
+    assert klient.post("/api/planer", json={"plan": plan, "idag": idag}, headers=rubrik(anv["ta"])).status_code == 200
+    v = klient.get(f"/api/planer/vecka?start={start.isoformat()}&idag={idag}", headers=rubrik(anv["ta"])).json()
+    alla = {p["titel"]: p for d in v["dagar"] for p in d["pass"]}
+    assert alla["Intervaller"]["kan_skickas"] and alla["Styrka"]["kan_skickas"] and not alla["Fotboll"]["kan_skickas"]
+    ids = [alla["Intervaller"]["id"], alla["Styrka"]["id"]]
+
+    # B kan inte skicka A:s pass — och då loggar vi inte ens in på Garmin
+    assert klient.post("/api/planer/garmin", json={"pass_ids": ids, "idag": idag}, headers=rubrik(anv["tb"])).status_code == 404
+    assert klient.delete(f"/api/passes/{ids[0]}/garmin", headers=rubrik(anv["tb"])).status_code == 404
+    assert logg["inloggningar"] == 0
+
+    r = klient.post("/api/planer/garmin", json={"pass_ids": ids + [alla["Fotboll"]["id"]], "idag": idag}, headers=rubrik(anv["ta"])).json()
+    ok = {x["id"]: x["ok"] for x in r["resultat"]}
+    assert ok[ids[0]] and ok[ids[1]] and not ok[alla["Fotboll"]["id"]]
+    assert logg["inloggningar"] == 1 and len(logg["upp"]) == 2 and logg["schema"][0][1] == start.isoformat()
+    löp = logg["upp"][0]
+    assert löp["sportType"]["sportTypeKey"] == "running" and löp["workoutSegments"][0]["workoutSteps"][1]["numberOfIterations"] == 4
+
+    # Omskickning tar bort den gamla versionen i Garmin först — inga dubbletter på klockan
+    klient.post("/api/planer/garmin", json={"pass_ids": [ids[0]], "idag": idag}, headers=rubrik(anv["ta"]))
+    assert logg["bort"] == [5001]
+    v = klient.get(f"/api/planer/vecka?start={start.isoformat()}&idag={idag}", headers=rubrik(anv["ta"])).json()
+    skickade = {p["titel"]: p["garmin_workout_id"] for d in v["dagar"] for p in d["pass"]}
+    assert skickade["Intervaller"] == 5003 and skickade["Styrka"] == 5002
+    assert all("garmin_schedule_id" not in p for d in v["dagar"] for p in d["pass"])
+
+    # Ta bort ett pass eller ersätta veckan städar i Garmin
+    klient.delete(f"/api/passes/{ids[1]}", headers=rubrik(anv["ta"]))
+    assert logg["städa"][-1] == [5002]
+    klient.post("/api/planer", json={"plan": {**plan, "pass": plan["pass"][:2]}, "idag": idag}, headers=rubrik(anv["ta"]))
+    assert 5003 in logg["städa"][-1]
+
+
+def test_garmin_konvertering():
+    from scripts.garmin_pass import till_garmin, zonnummer, tempo_till_ms
+    assert zonnummer("zon 1–2") == 2 and zonnummer("zon 4") == 4 and zonnummer("lugnt") is None
+    assert round(tempo_till_ms("5:00/km"), 3) == 3.333 and tempo_till_ms("snabbt") is None
+    w = till_garmin({"kategori": "running", "titel": "x"}, steg=[
+        {"typ": "intervall", "antal": 5, "distans_km": 1, "zon": "zon 4", "tempo": "4:00/km", "vila_min": 2}])
+    grupp = w["workoutSegments"][0]["workoutSteps"][0]
+    intervall, vila = grupp["workoutSteps"]
+    assert grupp["type"] == "RepeatGroupDTO" and grupp["numberOfIterations"] == 5
+    assert intervall["endCondition"]["conditionTypeKey"] == "distance" and intervall["endConditionValue"] == 1000
+    assert intervall["targetType"]["workoutTargetTypeKey"] == "pace.zone"          # kvalitetssteg styrs på tempo
+    assert intervall["targetValueOne"] < 1000 / 240 < intervall["targetValueTwo"]   # 4:00/km ± 5 s
+    assert vila["stepType"]["stepTypeKey"] == "recovery" and vila["endConditionValue"] == 120
+    lugn = till_garmin({"kategori": "running", "titel": "x"}, steg=[{"typ": "lugnt", "min": 40, "zon": "zon 2", "tempo": "6:00/km"}])
+    assert lugn["workoutSegments"][0]["workoutSteps"][0]["zoneNumber"] == 2              # lugnt styrs på puls
+    with pytest.raises(ValueError):
+        till_garmin({"kategori": "football", "titel": "x"})
+    with pytest.raises(ValueError):
+        till_garmin({"kategori": "strength_training", "titel": "x"})
+
+
 def test_bygg_historik():
     from api.routes.chat import bygg_historik
     assert bygg_historik([("assistant", "a"), ("user", "f1"), ("user", "f2"), ("assistant", "s")]) == [
