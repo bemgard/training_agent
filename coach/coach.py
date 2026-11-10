@@ -1,4 +1,5 @@
 import anthropic
+import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -50,7 +51,7 @@ def chat():
         
         response_text = ""
         with client.messages.stream(
-            model="claude-haiku-4-5-20251001",
+            model=os.environ.get("COACH_MODELL", "claude-haiku-5-5"),
             max_tokens=500,
             system=full_system,
             messages=messages

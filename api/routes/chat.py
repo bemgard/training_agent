@@ -14,6 +14,9 @@ from api.database import get_db, USE_SQLITE
 from scripts.context_builder import get_context
 from api.routes.auth import verifiera_token
 
+# Haiku 5.5: ~10x billigare än Haiku 4.5 (legacy). Byt utan kodändring via COACH_MODELL.
+COACH_MODELL = os.environ.get("COACH_MODELL", "claude-haiku-5-5")
+
 router = APIRouter()
 
 class ChatRequest(BaseModel):
@@ -67,7 +70,7 @@ async def chat(request: ChatRequest, authorization: str = Header(None)):
 
     def generate():
         with client.messages.stream(
-            model="claude-haiku-4-5-20251001",
+            model=COACH_MODELL,
             max_tokens=10000,
             system=system,
             messages=messages
