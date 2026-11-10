@@ -1,6 +1,6 @@
 """Fas 3: konverterar ett planerat pass (format från scripts/plan.py) till ett Garmin Connect-workout.
 
-ID:n följer Garmins workout-service (inte konstanterna i garminconnect/workout.py, som delvis är fel —
+ID:n följer Garmins workout-service och är verifierade mot ett riktigt konto 2026-11-10 (inte konstanterna i garminconnect/workout.py, som delvis är fel —
 biblioteket noterar själv att simning måste vara sporttyp 4). Verifiera mot ett riktigt konto med
 scripts/probe_garmin_pass.py innan ändringar här skickas till användare."""
 import re
@@ -8,7 +8,7 @@ import re
 SPORT = {
     "running": {"sportTypeId": 1, "sportTypeKey": "running", "displayOrder": 1},
     "cycling": {"sportTypeId": 2, "sportTypeKey": "cycling", "displayOrder": 2},
-    "strength_training": {"sportTypeId": 5, "sportTypeKey": "strength_training", "displayOrder": 5},
+    "strength_training": {"sportTypeId": 5, "sportTypeKey": "strength_training", "displayOrder": 3},
 }
 KAN_SKICKAS = set(SPORT)
 
