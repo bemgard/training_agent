@@ -208,7 +208,7 @@ export default function KroppSektion() {
     <div style={{ background: "#1a1a26", border: "1px solid #2a2a3a", borderRadius: 12, padding: "20px 24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={{ color: "#64748b", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: 8 }}>
-          <Scale size={14} color="#a78bfa" /> Kropp
+          <Scale size={14} color="#a78bfa" /> Vikt och kroppssammansättning
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button style={knappStil("#64748b")} onClick={() => setVisaProfil(v => !v)}>

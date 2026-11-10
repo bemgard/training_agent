@@ -1,3 +1,4 @@
+import PRCard from "./PRCard"
 import { useEffect, useState, useRef } from "react"
 import { Heart, HeartPulse, TrendingUp, Moon, Gauge, BarChart3, Flame, Scale3d, X } from "lucide-react"
 import { fetchTrender } from "../api"
@@ -401,7 +402,7 @@ function byggGrafer(data) {
   ]
 }
 
-export default function Trender() {
+export default function Trender({ profile }) {
   const [intervall, setIntervall] = useState(INTERVALL[3])
   const [data, setData] = useState(null)
   const [laddar, setLaddar] = useState(true)
@@ -449,6 +450,8 @@ export default function Trender() {
           </Kort>
         ))}
       </div>
+
+      <PRCard records={profile?.personliga_rekord || []} profile={profile} />
 
       {öppenGraf && <Detaljvy graf={öppenGraf} från={från} till={till} onStäng={() => setÖppen(null)} />}
     </div>
