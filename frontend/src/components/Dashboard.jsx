@@ -9,6 +9,7 @@ import ReadinessCard from "./ReadinessCard"
 import HRVCard from "./HRVCard"
 import KroppSektion from "./KroppSektion"
 import SomnDetalj from "./SomnDetalj"
+import DagsformKort from "./DagsformKort"
 import { useState } from "react"
 
 const BELASTNINGSZON = {
@@ -40,6 +41,7 @@ export default function Dashboard({ profile, aiSummary, onOpenChat, onUppdatera 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <DagsformKort />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <ReadinessCard readiness={profile?.readiness} />
         <HRVCard hrv={profile?.hrv} />

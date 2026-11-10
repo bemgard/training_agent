@@ -5,12 +5,14 @@ from pathlib import Path
 try:
     from scripts.aktivitetstyp import effektiv_typ, hämta_regler, KATEGORIER
     from scripts.atletprofil import beskriv as beskriv_atlet
+    from scripts.dagsform import beskriv as beskriv_dagsform, sjukvarning
     from scripts.kropp import beräkna as beräkna_kropp
     from scripts.belastning import daglig_serie, maxpuls as maxpuls_belastning
     from scripts.mal import beskriv as beskriv_mål
 except ImportError:
     from aktivitetstyp import effektiv_typ, hämta_regler, KATEGORIER
     from atletprofil import beskriv as beskriv_atlet
+    from dagsform import beskriv as beskriv_dagsform, sjukvarning
     from kropp import beräkna as beräkna_kropp
     from belastning import daglig_serie, maxpuls as maxpuls_belastning
     from mal import beskriv as beskriv_mål
@@ -163,7 +165,7 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     c.execute(f"""
         SELECT datum, sovtid_min, djup_sov_min, latt_sov_min, vaken_min, rem_sov_min,
                somnpoang, somn_kvalitet, hrv_natt, hrv_status, hrv_7d,
-               hrv_baslinje_lag, hrv_baslinje_hog, vilopuls_natt, bb_laddning
+               hrv_baslinje_lag, hrv_baslinje_hog, vilopuls_natt, bb_laddning, hudtemp_avvikelse
         FROM sleep_daily
         WHERE datum >= {ph} {uid_filter}
         ORDER BY datum DESC LIMIT 14
@@ -226,6 +228,23 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
         rad = c.fetchone()
         atlet = dict(zip(atlet_kolumner, rad)) if rad else None
 
+    idag_datum = datetime.now().date()
+    rapporter, besvär, varning = [], [], None
+    if user_id:
+        k = ["datum", "allmant", "symtom", "temp", "fritext"]
+        c.execute(f"SELECT {', '.join(k)} FROM dagsform WHERE user_id = {ph} AND datum >= {ph} ORDER BY datum DESC",
+                  (user_id, (idag_datum - timedelta(days=2)).isoformat()))
+        rapporter = [dict(zip(k, r)) for r in c.fetchall()]
+        k = ["kroppsdel", "typ", "niva", "niva_start", "start_datum", "senast_datum", "anteckning"]
+        c.execute(f"SELECT {', '.join(k)} FROM besvar WHERE user_id = {ph} AND aktiv = {ph} ORDER BY start_datum",
+                  (user_id, True))
+        besvär = [dict(zip(k, r)) for r in c.fetchall()]
+        k = ["datum", "hudtemp_avvikelse", "hrv_natt", "vilopuls_natt"]
+        c.execute(f"SELECT {', '.join(k)} FROM sleep_daily WHERE user_id = {ph} ORDER BY datum DESC LIMIT 15", (user_id,))
+        varning = sjukvarning([dict(zip(k, r)) for r in c.fetchall()])
+        if varning and (idag_datum - datetime.strptime(varning["datum"], "%Y-%m-%d").date()).days > 1:
+            varning = None
+
     kropp = []
     kroppsprofil = (None, None, None)
     if user_id:
@@ -243,6 +262,9 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     lines = []
     lines.append("=== TRÄNINGSPROFIL ===\n")
     lines.append(f"DAGENS DATUM: {datetime.now().strftime('%Y-%m-%d (%A)')}")
+
+    lines.append("\nDAGSFORM (självrapporterat av atleten — väger TYNGRE än klockans data, se reglerna för dagsform):")
+    lines.extend(beskriv_dagsform(rapporter, besvär, varning, idag_datum))
 
     lines.append("\nOM ATLETEN (atletens egna uppgifter — respektera skador, utrustning och preferenser):")
     lines.extend(beskriv_atlet(atlet, regler, KATEGORIER))
@@ -379,6 +401,8 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
                 delar.append(f"vilopuls {row[13]}")
             if row[14] is not None:
                 delar.append(f"BB-laddning +{row[14]}")
+            if row[15] is not None:
+                delar.append(f"hudtemp {row[15]:+.1f} °C")
             lines.append(" | ".join(delar))
     else:
         lines.append("  Ingen bekräftad sömndata tillgänglig")

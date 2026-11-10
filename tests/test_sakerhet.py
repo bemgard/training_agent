@@ -186,6 +186,53 @@ def test_om_mig_validering(anv):
         assert klient.post("/api/aktivitetsregler", json=data, headers=rubrik(anv["tb"])).status_code == 422, data
 
 
+def test_dagsform_och_besvar_ar_privata(anv):
+    idag = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    form = {"datum": idag, "allmant": "krasslig", "symtom": ["halsont", "feber"], "temp": 38.2, "fritext": "Annas feber"}
+    assert klient.put("/api/dagsform", json=form, headers=rubrik(anv["ta"])).status_code == 200
+    assert klient.put("/api/dagsform", json={**form, "temp": 38.6}, headers=rubrik(anv["ta"])).status_code == 200  # upsert
+    a = klient.get(f"/api/dagsform?datum={idag}", headers=rubrik(anv["ta"])).json()
+    assert a["idag"]["temp"] == 38.6 and a["idag"]["symtom"] == ["halsont", "feber"]
+    besvär = {"datum": idag, "kroppsdel": "baksida_lar", "typ": "skarp", "niva": 6}
+    assert klient.post("/api/besvar", json=besvär, headers=rubrik(anv["ta"])).status_code == 200
+    b_id = klient.get(f"/api/dagsform?datum={idag}", headers=rubrik(anv["ta"])).json()["besvar"][0]["id"]
+    # B ser inget av A:s och kan inte ändra eller avsluta A:s besvär
+    b = klient.get(f"/api/dagsform?datum={idag}", headers=rubrik(anv["tb"])).json()
+    assert b["idag"] is None and b["besvar"] == []
+    assert klient.patch(f"/api/besvar/{b_id}", json={"datum": idag, "niva": 1}, headers=rubrik(anv["tb"])).status_code == 404
+    assert klient.patch(f"/api/besvar/{b_id}", json={"datum": idag, "borta": True}, headers=rubrik(anv["tb"])).status_code == 404
+    # A kan förbättra och avsluta
+    assert klient.patch(f"/api/besvar/{b_id}", json={"datum": idag, "niva": 4}, headers=rubrik(anv["ta"])).status_code == 200
+    rest = klient.get(f"/api/dagsform?datum={idag}", headers=rubrik(anv["ta"])).json()["besvar"][0]
+    assert rest["niva"] == 4 and rest["niva_start"] == 6 and rest["dag"] == 1
+    assert klient.patch(f"/api/besvar/{b_id}", json={"datum": idag, "borta": True}, headers=rubrik(anv["ta"])).status_code == 200
+    assert klient.get(f"/api/dagsform?datum={idag}", headers=rubrik(anv["ta"])).json()["besvar"] == []
+
+
+def test_dagsform_validering(anv):
+    idag = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    fel_form = [{"datum": "2020-01-01", "allmant": "pigg"}, {"datum": "inte-datum"}, {"datum": idag, "allmant": "odödlig"},
+                {"datum": idag, "symtom": ["pest"]}, {"datum": idag, "temp": 50}, {"datum": idag, "fritext": "x" * 501}]
+    for data in fel_form:
+        assert klient.put("/api/dagsform", json=data, headers=rubrik(anv["tb"])).status_code == 422, data
+    fel_besvär = [{"datum": idag, "kroppsdel": "svans", "typ": "skarp", "niva": 3},
+                  {"datum": idag, "kroppsdel": "knä", "typ": "skarp", "niva": 11},
+                  {"datum": idag, "kroppsdel": "knä'; DROP TABLE besvar; --", "typ": "skarp", "niva": 3},
+                  {"datum": "2020-01-01", "kroppsdel": "knä", "typ": "skarp", "niva": 3}]
+    for data in fel_besvär:
+        assert klient.post("/api/besvar", json=data, headers=rubrik(anv["tb"])).status_code == 422, data
+    assert klient.get("/api/dagsform?datum=2020-01-01", headers=rubrik(anv["tb"])).status_code == 422
+
+
+def test_sjukvarning():
+    from scripts.dagsform import sjukvarning
+    normal = [{"datum": f"2026-10-{d:02d}", "hudtemp_avvikelse": 0.0, "hrv_natt": 90, "vilopuls_natt": 45} for d in range(30, 15, -1)]
+    sjuk = {"datum": "2026-10-31", "hudtemp_avvikelse": 1.0, "hrv_natt": 40, "vilopuls_natt": 52}
+    assert sjukvarning([sjuk] + normal)["stark"] is True
+    assert sjukvarning([{**sjuk, "hudtemp_avvikelse": 0.1, "vilopuls_natt": 46}] + normal) is None   # bara 1 signal
+    assert sjukvarning([sjuk] + normal[:3]) is None                                                  # för lite historik
+
+
 def test_klassningsregler():
     from scripts.aktivitetstyp import effektiv_typ
     regler = [{"plats": "Täby", "fran_kategori": "running", "max_km": 10, "till_kategori": "football"}]

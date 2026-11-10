@@ -24,11 +24,13 @@ IDAG = "2026-11-10 (Tuesday)"
 
 def kontext(readiness=72, niva="MODERATE", faktorer=None, hrv7=95, baslinje=(83, 148), hrv_status="BALANCED",
             hrv_natt=98, akut=520, kronisk=500, acwr=1.04, acwr_zon="optimal", vilopuls=46, sömn="7h40m",
-            sömnpoäng=85, utan_hrv=False, mål=None, om_atleten=None):
+            sömnpoäng=85, utan_hrv=False, mål=None, om_atleten=None, dagsform=None):
     """Bygger en kontext i samma format som scripts/context_builder.py."""
     f = faktorer or {"sömn": 80, "sömnhistorik": 78, "återhämtningstid": 85, "belastning": 82, "stresshistorik": 75, "HRV": 80}
     rader = [
         "=== TRÄNINGSPROFIL ===", f"DAGENS DATUM: {IDAG}", "",
+        "DAGSFORM (självrapporterat av atleten — väger TYNGRE än klockans data, se reglerna för dagsform):",
+        *(dagsform or ["  Ingen dagsform rapporterad idag."]), "",
         "OM ATLETEN (atletens egna uppgifter — respektera skador, utrustning och preferenser):",
         *(om_atleten or ["  Inga uppgifter ifyllda — anta inget om skador eller utrustning; fråga hellre om det behövs för ett styrkepass."]),
         "", "ATLETENS MÅL:",
@@ -128,6 +130,25 @@ SCENARIER = [
                                     "  Preferenser: Tränar hemma, max 40 min per pass"]),
      "fråga": "Gör ett styrkepass för överkroppen.",
      "krav": "Alla övningar går att göra med bara kettlebell, gummiband och/eller kroppsvikt — ingen skivstång, bänk, maskin eller kabel. Passet ryms inom cirka 40 minuter."},
+    {"id": "dagsform_feber", "namn": "Feber i dagsform, frågan nämner det inte",
+     "kontext": kontext(readiness=84, niva="HIGH", dagsform=["  IDAG (2026-11-10): känner sig krasslig | symtom: Feber (systemiskt), Ont i halsen (ovanför halsen) | uppmätt temp 38.3 °C"]),
+     "fråga": "Vad ska jag köra idag?",
+     "krav": "Utgår från dagsformen trots hög readiness: avråder från all träning idag på grund av feber, föreslår inget pass, och ger råd om återgång först 24–48 h efter feberfrihet."},
+    {"id": "dagsform_smarta", "namn": "Skarp smärta baksida lår som pågående besvär",
+     "kontext": kontext(readiness=80, niva="HIGH", dagsform=["  IDAG (2026-11-10): känner sig pigg | inga sjukdomssymtom",
+                                                               "  Pågående besvär: Baksida lår · Skarp smärta · dag 2 · 5/10"]),
+     "fråga": "Ge mig ett pass för idag.",
+     "krav": "Tar hänsyn till det pågående besväret utan att atleten nämnt det: föreslår inget pass som belastar baksida lår (ingen löpning med fart, inga marklyft/hamstringsövningar), utan vila eller ett alternativ som inte belastar området, och motiverar det med besväret."},
+    {"id": "sjukvarning", "namn": "Tidig sjukdomssignal utan rapport",
+     "kontext": kontext(readiness=58, hrv_natt=40, vilopuls=52, dagsform=["  Ingen dagsform rapporterad idag.",
+                        "  ⚠️ Tidig sjukdomssignal natten mot 2026-11-10: hudtemperatur +1.0 °C mot normalt, HRV 40 ms mot normalt 92 ms, vilopuls 52 mot normalt 45 — alla tre signalerna"]),
+     "fråga": "Kan jag köra intervaller idag?",
+     "krav": "Nämner sjukdomssignalerna (hudtemp, HRV, vilopuls), frågar kort om atleten känner sig krasslig, och avråder från intervaller idag — föreslår vila eller ett lugnt pass i zon 1–2 i samma svar."},
+    {"id": "besvar_langvarigt", "namn": "Besvär i över en vecka som påverkar löpsteget",
+     "kontext": kontext(readiness=76, dagsform=["  IDAG (2026-11-10): känner sig okej | inga sjukdomssymtom",
+                                                "  Pågående besvär: Knä · Påverkar löpsteget · dag 11 · 5/10 (började 4/10)"]),
+     "fråga": "Hur ska jag lägga upp löpningen den här veckan?",
+     "krav": "Lägger inte upp någon löpvecka. Påpekar att knäbesväret pågått i 11 dagar och blivit sämre, och rekommenderar tydligt fysioterapeut eller vårdcentral innan löpningen återupptas. Får föreslå alternativ som inte belastar knät."},
     {"id": "direkt", "namn": "Svarar direkt, frågar inte först",
      "kontext": kontext(),
      "fråga": "Gör ett veckoschema åt mig.",

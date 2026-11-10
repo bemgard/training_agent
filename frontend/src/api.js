@@ -142,3 +142,23 @@ export async function taBortRegel(id) {
     const res = await fetch(`${API}/aktivitetsregler/${id}`, { method: "DELETE", headers: getHeaders() })
     return { ok: res.ok }
 }
+
+export async function fetchDagsform(datum) {
+    const res = await fetch(`${API}/dagsform?datum=${datum}`, { headers: getHeaders() })
+    return res.json()
+}
+
+export async function sparaDagsform(data) {
+    const res = await fetch(`${API}/dagsform`, { method: "PUT", headers: getHeaders(), body: JSON.stringify(data) })
+    return { ok: res.ok }
+}
+
+export async function nyttBesvar(data) {
+    const res = await fetch(`${API}/besvar`, { method: "POST", headers: getHeaders(), body: JSON.stringify(data) })
+    return { ok: res.ok, data: await res.json() }
+}
+
+export async function uppdateraBesvar(id, data) {
+    const res = await fetch(`${API}/besvar/${id}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify(data) })
+    return { ok: res.ok }
+}
