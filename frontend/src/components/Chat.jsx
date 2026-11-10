@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react"
 import { hämtaToken } from "../token"
-import { Send } from "lucide-react"
+import { Send, Plus, Trash2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
-import { streamChat } from "../api"
+import { streamChat, skapaSamtal, fetchSamtalLista, fetchSamtal, taBortSamtal } from "../api"
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
@@ -100,15 +100,69 @@ function ChatMessage({ role, content }) {
   )
 }
 
-export default function Chat({ initialMessages = [], initialInput = "", onInitialInputConsumed }) {
-  const [messages, setMessages] = useState(initialMessages)
+function relativtDatum(iso) {
+  const d = new Date(iso.replace(" ", "T") + (/[Z+]/.test(iso.slice(10)) ? "" : "Z"))
+  const dagar = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 864e5)
+  if (dagar === 0) return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })
+  if (dagar === 1) return "Igår"
+  if (dagar < 7) return d.toLocaleDateString("sv-SE", { weekday: "long" })
+  return d.toLocaleDateString("sv-SE", { day: "numeric", month: "short" })
+}
+
+function SamtalsLista({ lista, aktivt, onVälj, onNytt, onTaBort }) {
+  return (
+    <div style={{ width: 230, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, borderRight: "1px solid #2a2a3a", paddingRight: 16, overflowY: "auto" }}>
+      <button onClick={onNytt} style={{
+        background: "#1a3a2e", border: "1px solid #6ee7b760", color: "#6ee7b7", borderRadius: 10, padding: "9px 12px",
+        cursor: "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8,
+      }}><Plus size={15} /> Nytt samtal</button>
+      {lista.length === 0 && <div style={{ fontSize: 12, color: "#64748b", padding: "8px 4px" }}>Dina samtal sparas här.</div>}
+      {lista.map(s => (
+        <div key={s.id} onClick={() => onVälj(s.id)} style={{
+          background: s.id === aktivt ? "#1a1a26" : "transparent", border: `1px solid ${s.id === aktivt ? "#2a2a3a" : "transparent"}`,
+          borderRadius: 10, padding: "8px 10px", cursor: "pointer", display: "flex", gap: 6, alignItems: "flex-start",
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.titel}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{relativtDatum(s.uppdaterad)} · {s.antal} meddelanden</div>
+          </div>
+          <button title="Ta bort samtal" onClick={e => { e.stopPropagation(); onTaBort(s.id) }}
+            style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", padding: 2 }}><Trash2 size={13} /></button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function Chat({ initialInput = "", onInitialInputConsumed }) {
+  const [messages, setMessages] = useState([])
   const [input, setInput] = useState(initialInput)
   const [streaming, setStreaming] = useState(false)
+  const [samtalId, setSamtalId] = useState(null)
+  const [lista, setLista] = useState([])
   const chatEndRef = useRef(null)
+
+  const laddaLista = () => fetchSamtalLista().then(setLista)
+  useEffect(() => {
+    laddaLista()
+    // Öppna samtalet du hade uppe senast i den här fliken (överlever flikbyte i appen)
+    let senaste = null
+    try { senaste = Number(sessionStorage.getItem("aktivtSamtal")) || null } catch { /* privat läge */ }
+    if (senaste && !initialInput) väljSamtal(senaste)
+  }, [])
+
+  useEffect(() => {
+    try {
+      if (samtalId) sessionStorage.setItem("aktivtSamtal", String(samtalId))
+      else sessionStorage.removeItem("aktivtSamtal")
+    } catch { /* privat läge */ }
+  }, [samtalId])
 
   useEffect(() => {
     if (initialInput) {
       setInput(initialInput)
+      setSamtalId(null)
+      setMessages([])
       onInitialInputConsumed?.()
     }
   }, [initialInput])
@@ -117,17 +171,42 @@ export default function Chat({ initialMessages = [], initialInput = "", onInitia
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  async function send() {
-    if (!input.trim() || streaming) return
+  async function väljSamtal(id) {
+    if (streaming) return
+    const s = await fetchSamtal(id)
+    if (!s) return laddaLista()
+    setSamtalId(id)
+    setMessages(s.meddelanden)
+  }
 
-    const userMsg = { role: "user", content: input }
-    setMessages(prev => [...prev, userMsg, { role: "assistant", content: "" }])
+  function nyttSamtal() {
+    if (streaming) return
+    setSamtalId(null)
+    setMessages([])
+  }
+
+  async function taBort(id) {
+    if (!confirm("Ta bort samtalet?")) return
+    await taBortSamtal(id)
+    if (id === samtalId) nyttSamtal()
+    laddaLista()
+  }
+
+  async function send() {
+    const text = input.trim()
+    if (!text || streaming) return
+
+    setMessages(prev => [...prev, { role: "user", content: text }, { role: "assistant", content: "" }])
     setInput("")
     setStreaming(true)
 
-    const history = messages.map(m => ({ role: m.role, content: m.content }))
+    let id = samtalId
+    if (!id) {
+      id = await skapaSamtal()
+      setSamtalId(id)
+    }
 
-    await streamChat(input, history, (full) => {
+    await streamChat(text, id, (full) => {
       setMessages(prev => {
         const updated = [...prev]
         updated[updated.length - 1] = { role: "assistant", content: full }
@@ -136,12 +215,15 @@ export default function Chat({ initialMessages = [], initialInput = "", onInitia
     })
 
     setStreaming(false)
+    laddaLista()
   }
 
   return (
     <>
     <style>{RUNNER_CSS}</style>
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 180px)" }}>
+    <div style={{ display: "flex", gap: 20, height: "calc(100vh - 180px)" }}>
+    <SamtalsLista lista={lista} aktivt={samtalId} onVälj={väljSamtal} onNytt={nyttSamtal} onTaBort={taBort} />
+    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: 16 }}>
         {messages.length === 0 && (
           <div style={{ textAlign: "center", color: "#64748b", marginTop: 80 }}>
@@ -188,6 +270,7 @@ export default function Chat({ initialMessages = [], initialInput = "", onInitia
           <Send size={16} />
         </button>
       </div>
+    </div>
     </div>
     </>
   )

@@ -14,12 +14,16 @@ export async function fetchProfile() {
     return res.json()
 }
 
-export async function streamChat(message, history, onChunk) {
+export async function streamChat(message, samtalId, onChunk) {
     const response = await fetch(`${API}/chat`, {
         method: "POST",
         headers: getHeaders(),
-        body: JSON.stringify({ message, history })
+        body: JSON.stringify({ message, samtal_id: samtalId })
     })
+    if (!response.ok) {
+        onChunk("⚠️ Kunde inte skicka meddelandet.")
+        return
+    }
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
@@ -160,5 +164,25 @@ export async function nyttBesvar(data) {
 
 export async function uppdateraBesvar(id, data) {
     const res = await fetch(`${API}/besvar/${id}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify(data) })
+    return { ok: res.ok }
+}
+
+export async function skapaSamtal() {
+    const res = await fetch(`${API}/samtal`, { method: "POST", headers: getHeaders(), body: JSON.stringify({}) })
+    return (await res.json()).id
+}
+
+export async function fetchSamtalLista() {
+    const res = await fetch(`${API}/samtal`, { headers: getHeaders() })
+    return res.ok ? res.json() : []
+}
+
+export async function fetchSamtal(id) {
+    const res = await fetch(`${API}/samtal/${id}`, { headers: getHeaders() })
+    return res.ok ? res.json() : null
+}
+
+export async function taBortSamtal(id) {
+    const res = await fetch(`${API}/samtal/${id}`, { method: "DELETE", headers: getHeaders() })
     return { ok: res.ok }
 }
