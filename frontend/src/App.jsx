@@ -7,6 +7,7 @@ import Chat from "./components/Chat"
 import Login from "./components/Login"
 import TraningsPlan from "./components/TraningsPlan"
 import Trender from "./components/Trender"
+import Kost from "./components/Kost"
 
 export default function App() {
   const [profile, setProfile] = useState(null)
@@ -76,6 +77,7 @@ export default function App() {
           <Dashboard profile={profile} onOpenChat={() => setActiveTab("chat")} onUppdatera={uppdateraProfil} />
         )}
         {activeTab === "trender" && <Trender />}
+        {activeTab === "kost" && <Kost />}
         {activeTab === "chat" && (
           <Chat
             initialInput={chatInitialInput}

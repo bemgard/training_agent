@@ -32,6 +32,7 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
     { id: "trender", label: "Trender" },
     { id: "chat", label: "AI-Coach" },
     { id: "plan", label: "Träningsplan" },
+    { id: "kost", label: "Kost", snart: true },
   ]
 
   async function triggerSync() {
@@ -123,6 +124,12 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
               fontWeight: 500,
             }}>
               {tab.label}
+              {tab.snart && (
+                <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                  color: "#fbbf24", background: "#fbbf241a", border: "1px solid #fbbf2440", borderRadius: 999, padding: "1px 6px" }}>
+                  Snart
+                </span>
+              )}
             </button>
           ))}
         </div>
