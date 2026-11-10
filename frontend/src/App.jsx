@@ -74,7 +74,8 @@ export default function App() {
       <Header activeTab={activeTab} setActiveTab={setActiveTab} profile={profile} onLogout={onLogout} />
       <div className="app-innehall" style={{ maxWidth: 1200, margin: "0 auto", padding: "32px" }}>
         {activeTab === "dashboard" && (
-          <Dashboard profile={profile} onÖppnaPlan={() => { setActiveTab("plan"); window.scrollTo(0, 0) }} onUppdatera={uppdateraProfil} />
+          <Dashboard profile={profile} onÖppnaPlan={() => { setActiveTab("plan"); window.scrollTo(0, 0) }} onUppdatera={uppdateraProfil}
+            onFrågaCoach={(fråga) => { setChatInitialInput(fråga); setActiveTab("chat"); window.scrollTo(0, 0) }} />
         )}
         {activeTab === "trender" && <Trender profile={profile} />}
         {activeTab === "kost" && <Kost />}

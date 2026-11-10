@@ -18,7 +18,7 @@ const BELASTNINGSZON = {
   hög: { label: "hög", color: "#ef4444" },
 }
 
-export default function Dashboard({ profile, onÖppnaPlan, onUppdatera }) {
+export default function Dashboard({ profile, onÖppnaPlan, onUppdatera, onFrågaCoach }) {
   const [visaSömn, setVisaSömn] = useState(false)
   const [dagsformÄndrad, setDagsformÄndrad] = useState(false)
   const hälsa = profile?.hälsodata || []
@@ -91,7 +91,7 @@ export default function Dashboard({ profile, onÖppnaPlan, onUppdatera }) {
             sparkline={(profile?.belastning || []).map(d => d.akut)}
           />
         </div>
-        <ActivityLog aktiviteter={profile?.aktiviteter} onUppdatera={onUppdatera} />
+        <ActivityLog onUppdatera={onUppdatera} onFrågaCoach={onFrågaCoach} />
       </Sektion>
 
       <Sektion titel="Kropp">

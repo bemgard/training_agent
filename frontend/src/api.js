@@ -225,3 +225,8 @@ export async function taBortPlan(id) {
     const res = await fetch(`${API}/planer/${id}`, { method: "DELETE", headers: getHeaders() })
     return { ok: res.ok }
 }
+
+export async function fetchAktiviteter(offset = 0, limit = 10) {
+    const res = await fetch(`${API}/aktiviteter?offset=${offset}&limit=${limit}`, { headers: getHeaders() })
+    return res.ok ? res.json() : { aktiviteter: [], fler: false }
+}

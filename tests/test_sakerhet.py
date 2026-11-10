@@ -540,6 +540,18 @@ def test_ta_bort_plan(anv, monkeypatch):
     assert klient.delete(f"/api/planer/{plan_id}", headers=rubrik(anv["ta"])).status_code == 404
 
 
+def test_aktivitetslistan(anv):
+    a = klient.get("/api/aktiviteter?limit=1", headers=rubrik(anv["ta"])).json()
+    assert len(a["aktiviteter"]) == 1 and a["fler"] is True
+    rad = a["aktiviteter"][0]
+    assert {"kategori", "zoner_min", "trimp", "intensitet", "planerat"} <= set(rad)
+    nästa = klient.get("/api/aktiviteter?limit=1&offset=1", headers=rubrik(anv["ta"])).json()["aktiviteter"]
+    assert len(nästa) == 1
+    assert not {x["activity_id"] for x in nästa} & {x["activity_id"] for x in a["aktiviteter"]}
+    assert klient.get("/api/aktiviteter", headers=rubrik(anv["tb"])).json() == {"aktiviteter": [], "fler": False}
+    assert klient.get("/api/aktiviteter?limit=500", headers=rubrik(anv["ta"])).status_code == 422
+
+
 def test_bygg_historik():
     from api.routes.chat import bygg_historik
     assert bygg_historik([("assistant", "a"), ("user", "f1"), ("user", "f2"), ("assistant", "s")]) == [

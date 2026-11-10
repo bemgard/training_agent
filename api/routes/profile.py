@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from datetime import datetime, timedelta
 from collections import defaultdict
 from api.database import get_db, USE_SQLITE
@@ -6,7 +6,8 @@ from api.routes.auth import verifiera_token
 from pydantic import BaseModel
 from typing import Optional
 from scripts.aktivitetstyp import effektiv_typ, hämta_regler, KATEGORIER
-from scripts.belastning import daglig_serie, maxpuls
+from scripts.belastning import daglig_serie, maxpuls, trimp
+from scripts.plan import stäm_av
 
 router = APIRouter()
 ph = "?" if USE_SQLITE else "%s"
@@ -24,6 +25,64 @@ def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Inte inloggad")
     token = authorization.split(" ")[1]
     return verifiera_token(token)
+
+AKT_KOLUMNER = """activity_id, datum, namn, typ, typ_manuell, distans_km, duration_min, snitt_puls, max_puls,
+               snitt_tempo, plats, elevation_gain, zon1_sek, zon2_sek, zon3_sek, zon4_sek, zon5_sek"""
+
+
+@router.get("/aktiviteter")
+def aktiviteter(offset: int = Query(0, ge=0), limit: int = Query(10, ge=1, le=50),
+                db=Depends(get_db), user=Depends(get_current_user)):
+    """Aktivitetslistan på översikten: kategori, pulszoner, belastning (TRIMP) relativt atletens vanliga pass
+    och koppling till planerat pass samma dag (samma avstämning som veckovyn)."""
+    uid = user["user_id"]
+    c = db.cursor()
+    regler = hämta_regler(c, uid, ph)
+    c.execute(f"SELECT {AKT_KOLUMNER} FROM activities WHERE typ NOT IN ('golf') AND user_id = {ph} "
+              f"ORDER BY datum DESC, activity_id DESC LIMIT {ph} OFFSET {ph}", (uid, limit + 1, offset))
+    rader = [med_kategori(r, regler) for r in c.fetchall()]
+    fler = len(rader) > limit
+    rader = rader[:limit]
+    if not rader:
+        return {"aktiviteter": [], "fler": False}
+
+    # Belastning relativt de senaste 90 dagarnas pass (90:e percentilen = "tungt pass för dig")
+    c.execute(f"SELECT snitt_puls, max_puls, duration_min, zon1_sek, zon2_sek, zon3_sek, zon4_sek, zon5_sek "
+              f"FROM activities WHERE user_id = {ph} AND datum >= {ph}",
+              (uid, (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")))
+    historik = [dict(r) for r in c.fetchall()]
+    hrmax = maxpuls(historik) or max((p.get("max_puls") or 0 for p in historik), default=0) or None
+    alla_trimp = sorted(t for t in (trimp(p, hrmax) for p in historik) if t)
+    tung = alla_trimp[int(len(alla_trimp) * 0.9)] if len(alla_trimp) >= 5 else None
+
+    # Koppling till planerade pass under samma period
+    från, till = rader[-1]["datum"], rader[0]["datum"]
+    c.execute(f"SELECT id, datum, kategori, titel, activity_id FROM planerade_pass "
+              f"WHERE user_id = {ph} AND datum >= {ph} AND datum <= {ph}", (uid, från, till))
+    planerade = [dict(r) for r in c.fetchall()]
+    kopplat = {}
+    if planerade:
+        avstämda, _ = stäm_av(planerade, [dict(r) for r in rader], datetime.now().date(), regler)
+        kopplat = {p["utfort"]["activity_id"]: p["titel"] for p in avstämda if p.get("utfort")}
+
+    ut = []
+    for r in rader:
+        t = trimp(r, hrmax)
+        zoner = [round((r.get(f"zon{i}_sek") or 0) / 60, 1) for i in range(1, 6)]
+        relativ = round(t / tung, 2) if t and tung else None
+        ut.append({
+            **{k: r.get(k) for k in ("activity_id", "datum", "namn", "typ", "typ_manuell", "kategori", "gissad",
+                                     "distans_km", "duration_min", "snitt_puls", "max_puls", "snitt_tempo", "plats",
+                                     "elevation_gain")},
+            "zoner_min": zoner if sum(zoner) > 0 else None,
+            "trimp": round(t) if t else None,
+            # TRIMP mäter pulsbelastning — för styrka säger den inget om muskulär belastning, så ingen etikett där
+            "intensitet": None if relativ is None or r.get("kategori") == "strength_training"
+                          else ("lätt" if relativ < 0.45 else "medel" if relativ < 0.85 else "tung"),
+            "planerat": kopplat.get(r["activity_id"]),
+        })
+    return {"aktiviteter": ut, "fler": fler}
+
 
 @router.get("/profile")
 def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
