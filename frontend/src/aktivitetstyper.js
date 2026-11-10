@@ -1,4 +1,4 @@
-// Delas av WeeklyLoad och ActivityLog. Nycklarna matchar scripts/aktivitetstyp.py (KATEGORIER).
+// Delas av ActivityLog, veckovyn och veckoremsan. Nycklarna matchar scripts/aktivitetstyp.py (KATEGORIER).
 export const KATEGORIER = {
   running: { namn: "Löpning", ikon: "🏃", färg: "#6ee7b7" },
   football: { namn: "Fotboll", ikon: "⚽", färg: "#60a5fa" },
