@@ -168,7 +168,7 @@ SCENARIER = [
                               "  2026-11-14 [kommande] Styrketräning: Helkropp B (50 min)",
                               "  2026-11-15 [kommande] Löpning: Långpass (14 km | 85 min | zon 2)"]),
      "fråga": "Vad ska jag köra idag?",
-     "krav": "Utgår från dagens planerade intervallpass och byter det mot lugn löpning i zon 1–2 (eller vila) på grund av halsontet. Föreslår att intervallerna flyttas senare i veckan bara om halsen är bra, och skickar ett [PLAN]-block med den justerade resten av veckan.",
+     "krav": "Utgår från dagens planerade intervallpass och byter det mot lugn löpning i zon 1–2 (eller vila) på grund av halsontet, utan intensitet. Intervallerna stryks eller skjuts upp tills halsen är bra — de får inte läggas in villkorat i blocket. [PLAN]-blocket innehåller ANTINGEN bara dagens ändrade pass (2026-11-10), ELLER alla återstående pass i veckan (2026-11-10, 11-12, 11-14 och 11-15) — inte ett urval där planerade pass i veckan saknas.",
      "kräver_plan": True},
     {"id": "plan_missat", "namn": "Missat pass, resten av veckan",
      "kontext": kontext(readiness=78, niva="HIGH",

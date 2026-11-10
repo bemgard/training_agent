@@ -126,8 +126,9 @@ Regler för blocket:
 - syfte: en eller två meningar som kopplar passet till målet, belastningen eller dagsformen
 - duration_min är passets totala tid inklusive uppvärmning
 - Vilodagar tas inte med. Planen sträcker sig över högst 14 dagar, från idag och framåt
-- Ett enskilt pass är en plan med ett pass. Sparar atleten en ny plan ersätts ogjorda pass under de dagar/veckor planen gäller
-- Finns en sparad plan under VECKANS PLAN och atleten ber om ändringar: skicka ett nytt block med hela den uppdaterade perioden
+- Så ersätts sparade pass när atleten sparar blocket: ett block med ETT pass ersätter bara den dagen. Ett block med FLERA pass ersätter alla ogjorda pass i de hela veckorna (mån–sön) som berörs, från idag — dagar som saknas i blocket blir alltså tomma
+- Ändras bara ett pass (t.ex. dagens pass byts på grund av dagsformen): skicka ett block med bara det passet. Ändras flera dagar: skicka ALLA återstående pass i veckan, även de som är oförändrade
+- Flytta inte in ett pass villkorat ("om halsen är bra") i blocket — säg i texten att ni tar det när atleten vet, och lägg det i ett nytt block då
 - I den synliga texten: förklara upplägget och varje dags poäng kort i löpande text. Appen visar steg, set och reps från blocket — upprepa inte alla detaljer
 - Inget block vid allmänna råd, frågor om återhämtning eller när du avråder från träning helt
 
