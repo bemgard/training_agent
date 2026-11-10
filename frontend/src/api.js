@@ -198,3 +198,13 @@ export async function taBortSamtal(id) {
     const res = await fetch(`${API}/samtal/${id}`, { method: "DELETE", headers: getHeaders() })
     return { ok: res.ok }
 }
+
+export async function fetchInsikt(datum) {
+    const res = await fetch(`${API}/insikt?datum=${datum}`, { headers: getHeaders() })
+    return res.ok ? res.json() : null
+}
+
+export async function uppdateraInsikt(datum) {
+    const res = await fetch(`${API}/insikt/morgon`, { method: "POST", headers: getHeaders(), body: JSON.stringify({ datum }) })
+    return { ok: res.ok, status: res.status, data: await res.json() }
+}

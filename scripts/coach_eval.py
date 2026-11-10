@@ -19,6 +19,7 @@ load_dotenv(BASE_DIR / ".env")
 import anthropic
 sys.path.insert(0, str(BASE_DIR))
 from scripts.plan import Plan
+from api.insikt import UPPGIFT, _tolka
 
 DOMARE = "claude-sonnet-5-5"
 IDAG = "2026-11-10 (Tuesday)"
@@ -182,6 +183,42 @@ SCENARIER = [
      "fråga": "Jag missade intervallerna igår. Hur lägger jag resten av veckan?",
      "krav": "Pressar inte in det missade passet ovanpå allt annat (inga två kvalitetspass i rad, inga intervaller dagen före eller efter långpasset). Antingen byter ett av de kommande passen mot intervallerna eller stryker dem den här veckan, och motiverar valet. Skickar ett [PLAN]-block för de återstående dagarna 2026-11-10–2026-11-15.",
      "kräver_plan": True},
+    {"id": "insikt_som_planerat", "insikt": "morgon", "namn": "Morgoninsikt: allt grönt, pass planerat",
+     "kontext": kontext(readiness=82, niva="HIGH", dagsform=["  IDAG (2026-11-10): känner sig pigg | inga sjukdomssymtom"],
+                        plan=["  Aktuell plan: Basvecka 1", "  2026-11-10 [IDAG] Löpning: Lugn distans (8 km | 50 min | zon 2)",
+                              "  2026-11-12 [kommande] Styrketräning: Helkropp B (50 min)"]),
+     "fråga": "(morgoninsikt)",
+     "krav": "Kort insikt som bekräftar dagens planerade lugna distanspass (8 km i zon 2) med stöd av readiness 82, HRV och sömn. Rekommendationen är som_planerat. Inga påhittade värden.",
+     "förväntad_rek": ["som_planerat"]},
+    {"id": "insikt_halsont", "insikt": "morgon", "namn": "Morgoninsikt: intervaller planerade men halsont",
+     "kontext": kontext(readiness=70, dagsform=["  IDAG (2026-11-10): känner sig okej | symtom: Ont i halsen (ovanför halsen)"],
+                        plan=["  Aktuell plan: Basvecka 1", "  2026-11-10 [IDAG] Löpning: Intervaller 5×4 min (9.5 km | 55 min | zon 4 | 4:45/km)"]),
+     "fråga": "(morgoninsikt)",
+     "krav": "Insikten säger att dagens intervaller byts mot lugnt i zon 1–2 (eller vila) på grund av halsontet, och planen (om den finns) är ett lugnt pass för idag utan intensitet.",
+     "förväntad_rek": ["justera", "vila"]},
+    {"id": "insikt_feber", "insikt": "morgon", "namn": "Morgoninsikt: feber",
+     "kontext": kontext(readiness=85, niva="HIGH", dagsform=["  IDAG (2026-11-10): känner sig krasslig | symtom: Feber (systemiskt) | uppmätt temp 38.4 °C"],
+                        plan=["  2026-11-10 [IDAG] Löpning: Långpass (14 km | 85 min | zon 2)"]),
+     "fråga": "(morgoninsikt)",
+     "krav": "Insikten säger tydligt vila — ingen träning alls på grund av feber, trots hög readiness — och nämner återgång först efter feberfrihet.",
+     "förväntad_rek": ["vila"], "ingen_plan": True},
+    {"id": "insikt_sjukvarning", "insikt": "morgon", "namn": "Morgoninsikt: sjukdomssignal utan dagsform",
+     "kontext": kontext(readiness=55, hrv_natt=40, vilopuls=52, dagsform=["  Ingen dagsform rapporterad idag.",
+                        "  ⚠️ Tidig sjukdomssignal natten mot 2026-11-10: hudtemperatur +1.0 °C mot normalt, HRV 40 ms mot normalt 92 ms, vilopuls 52 mot normalt 45 — alla tre signalerna"],
+                        plan=["  2026-11-10 [IDAG] Löpning: Tempo 3×8 min (10 km | 55 min | zon 3–4)"]),
+     "fråga": "(morgoninsikt)",
+     "krav": "Insikten lyfter sjukdomssignalerna, ber atleten fylla i dagsformen, och avråder från tempopasset idag (lugnt eller vila).",
+     "förväntad_rek": ["justera", "vila"]},
+    {"id": "insikt_vecka", "insikt": "vecka", "namn": "Veckosammanfattning på söndag",
+     "kontext": kontext(plan=["  Aktuell plan: Basvecka 1",
+                              "  2026-11-09 [GENOMFÖRT] Styrketräning: Helkropp A (50 min) → gjort: 52 min | puls 104",
+                              "  2026-11-10 [MISSAT] Löpning: Intervaller 5×4 min (9.5 km | 55 min | zon 4)",
+                              "  2026-11-12 [GENOMFÖRT] Löpning: Lugn distans (8 km | 50 min | zon 2) → gjort: 8.3 km | 51 min | puls 128",
+                              "  2026-11-14 [GENOMFÖRT] Styrketräning: Helkropp B (50 min) → gjort: 47 min | puls 101",
+                              "  2026-11-15 [IDAG] Löpning: Långpass (14 km | 85 min | zon 2)"]),
+     "fråga": "(veckosammanfattning)",
+     "krav": "Sammanfattar veckan med konkreta värden: 3 av 4 hittills genomförda pass, att intervallerna missades, belastningen (ACWR) och fokus för nästa vecka utifrån målet. Påstår inte att långpasset är gjort.",
+     },
     {"id": "direkt", "namn": "Svarar direkt, frågar inte först",
      "kontext": kontext(),
      "fråga": "Gör ett veckoschema åt mig.",
@@ -193,6 +230,18 @@ SCENARIER = [
 def format_kontroller(svar, scenario):
     """Regelbaserade kontroller som inte behöver en domare."""
     fel = []
+    if scenario.get("insikt"):
+        try:
+            ut = _tolka(svar, scenario["insikt"])
+        except Exception as e:
+            return [f"insikten går inte att tolka: {e}"]
+        if scenario.get("förväntad_rek") and ut.get("rekommendation") not in scenario["förväntad_rek"]:
+            fel.append(f"rekommendation {ut.get('rekommendation')}, förväntat {scenario['förväntad_rek']}")
+        if scenario.get("kräver_plan") and not ut.get("plan"):
+            fel.append("saknar giltig plan för dagens pass")
+        if scenario.get("ingen_plan") and ut.get("plan"):
+            fel.append("har plan fast ingen träning ska föreslås")
+        return fel
     synlig = re.sub(r"\[PLAN\].*?(\[/PLAN\]|$)", "", svar, flags=re.S)
     if re.search(r"^\s{0,3}#{1,6}\s", synlig, re.M):
         fel.append("markdown-rubrik (#)")
@@ -255,7 +304,7 @@ def kör_scenario(klient, modell, systemprompt, s):
     t0 = time.time()
     r = klient.messages.create(model=modell, max_tokens=8000,
                                system=f"{systemprompt}\n\n== ANVÄNDARENS TRÄNINGSDATA ==\n{s['kontext']}",
-                               messages=[{"role": "user", "content": s["fråga"]}])
+                               messages=[{"role": "user", "content": UPPGIFT[s["insikt"]] if s.get("insikt") else s["fråga"]}])
     svar = "".join(b.text for b in r.content if b.type == "text")
     fmt = format_kontroller(svar, s)
     dom = domare(klient, s, svar)

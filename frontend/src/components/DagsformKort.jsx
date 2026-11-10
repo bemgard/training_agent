@@ -57,7 +57,7 @@ function NyttBesvärFormulär({ val, datum, onKlar }) {
   )
 }
 
-export default function DagsformKort() {
+export default function DagsformKort({ onÄndrad }) {
   const datum = lokaltDatum(new Date())
   const [data, setData] = useState(null)
   const [redigerar, setRedigerar] = useState(false)
@@ -78,10 +78,11 @@ export default function DagsformKort() {
     const ny = { ...rapport, ...ändring }
     const t = String(ny.temp ?? "").replace(",", ".")
     await sparaDagsform({ datum, allmant: ny.allmant, symtom: ny.symtom, temp: t === "" ? null : Number(t), fritext: ny.fritext || null })
+    onÄndrad?.()
     ladda()
   }
   const växlaSymtom = s => spara({ symtom: rapport.symtom.includes(s) ? rapport.symtom.filter(x => x !== s) : [...rapport.symtom, s] })
-  const ändraBesvär = async (b, ändring) => { await uppdateraBesvar(b.id, { datum, ...ändring }); ladda() }
+  const ändraBesvär = async (b, ändring) => { await uppdateraBesvar(b.id, { datum, ...ändring }); onÄndrad?.(); ladda() }
 
   const vald = ALLMÄNT[rapport.allmant]
   const kantfärg = varning && !idag ? "#f8717160" : vald ? vald.färg + "40" : C.border
@@ -157,7 +158,7 @@ export default function DagsformKort() {
         </div>
       ))}
       {nyttBesvär ? (
-        <NyttBesvärFormulär val={val} datum={datum} onKlar={sparat => { setNyttBesvär(false); if (sparat) ladda() }} />
+        <NyttBesvärFormulär val={val} datum={datum} onKlar={sparat => { setNyttBesvär(false); if (sparat) { onÄndrad?.(); ladda() } }} />
       ) : (
         <button style={{ ...knapp, marginTop: besvar.length ? 6 : 12 }} onClick={() => setNyttBesvär(true)}><Plus size={13} /> Ont någonstans</button>
       )}

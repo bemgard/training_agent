@@ -9,7 +9,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import profile, chat, sync, auth as auth_routes, passes, kropp, trender, mal, atlet, dagsform
+from api.routes import profile, chat, sync, auth as auth_routes, passes, kropp, trender, mal, atlet, dagsform, insikt
 from api.database import open_conn, USE_SQLITE
 
 @asynccontextmanager
@@ -58,6 +58,7 @@ app.include_router(trender.router, prefix="/api")
 app.include_router(mal.router, prefix="/api")
 app.include_router(atlet.router, prefix="/api")
 app.include_router(dagsform.router, prefix="/api")
+app.include_router(insikt.router, prefix="/api")
 
 @app.get("/")
 def root():

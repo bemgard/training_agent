@@ -10,6 +10,7 @@ import HRVCard from "./HRVCard"
 import KroppSektion from "./KroppSektion"
 import SomnDetalj from "./SomnDetalj"
 import DagsformKort from "./DagsformKort"
+import InsiktKort from "./InsiktKort"
 import { useState } from "react"
 
 const BELASTNINGSZON = {
@@ -21,6 +22,7 @@ const BELASTNINGSZON = {
 
 export default function Dashboard({ profile, aiSummary, onOpenChat, onUppdatera }) {
   const [visaSömn, setVisaSömn] = useState(false)
+  const [dagsformÄndrad, setDagsformÄndrad] = useState(false)
   const hälsa = profile?.hälsodata || []
   const belastningNu = profile?.belastning?.[profile.belastning.length - 1]
   const hälsaMedData = hälsa.filter(d => d.body_battery_hogst)
@@ -41,7 +43,8 @@ export default function Dashboard({ profile, aiSummary, onOpenChat, onUppdatera 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <DagsformKort />
+      <InsiktKort dagsformÄndrad={dagsformÄndrad} />
+      <DagsformKort onÄndrad={() => setDagsformÄndrad(true)} />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <ReadinessCard readiness={profile?.readiness} />
         <HRVCard hrv={profile?.hrv} />

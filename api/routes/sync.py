@@ -18,6 +18,18 @@ SYNK_TIMEOUT_SEK = 900
 _pågående = threading.Lock()  # en schemalagd körning åt gången
 
 
+def skapa_insikter(user_id: int, källa: str, söndag: bool = False):
+    """Efter en lyckad synk: morgoninsikt (om den inte redan finns) och på söndagar veckosammanfattning.
+    Fel här får aldrig fälla synken."""
+    from api.insikt import skapa
+    idag = datetime.now(ZoneInfo("Europe/Stockholm")).date()
+    for typ in (["morgon", "vecka"] if söndag else ["morgon"]):
+        try:
+            skapa(user_id, typ, idag, källa)
+        except Exception as e:
+            print(f"INSIKT FEL (user {user_id}, {typ}): {type(e).__name__}: {e}")
+
+
 def get_current_user(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Inte inloggad")
@@ -67,7 +79,11 @@ def kör_synk(user_id: int, källa: str) -> dict:
 
 @router.post("/sync")
 def sync(user=Depends(get_current_user)):
-    return kör_synk(user["user_id"], "manuell")
+    r = kör_synk(user["user_id"], "manuell")
+    if r["ok"]:
+        # Ny användare eller missad morgonsynk: skapa dagens insikt i bakgrunden om den saknas
+        threading.Thread(target=skapa_insikter, args=(user["user_id"], "manuell"), daemon=True).start()
+    return r
 
 
 @router.get("/sync/status")
@@ -91,6 +107,8 @@ def _synka_alla():
         for uid in användare:  # i tur och ordning — skonsamt mot Garmin
             r = kör_synk(uid, "schema")
             print(f"Schemalagd synk user {uid}: {'OK' if r['ok'] else 'FEL'}")
+            if r["ok"]:
+                skapa_insikter(uid, "schema", söndag=datetime.now(ZoneInfo("Europe/Stockholm")).weekday() == 6)
     finally:
         _pågående.release()
 

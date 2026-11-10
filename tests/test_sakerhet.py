@@ -2,7 +2,7 @@
 Körs mot en tillfällig SQLite-databas byggd från db/migrations (rör aldrig Supabase).
 Kör:  .venv/bin/python -m pytest tests/test_sakerhet.py -v
 """
-import os, re, sys, time, sqlite3, tempfile, subprocess, datetime
+import os, re, sys, json, time, sqlite3, tempfile, subprocess, datetime
 from pathlib import Path
 import pytest
 
@@ -369,6 +369,69 @@ def test_plan_validering(anv):
         assert klient.post("/api/planer", json={"plan": plan, "idag": idag}, headers=rubrik(anv["tb"])).status_code == 422, plan
     assert klient.post("/api/planer", json={"plan": {"titel": "x", "pass": [bas]}, "idag": "2020-01-01"},
                        headers=rubrik(anv["tb"])).status_code == 422
+
+
+class _FalskInsiktKlient:
+    """Ersätter Anthropic-klienten: returnerar ett fast JSON-svar och räknar anropen."""
+    def __init__(self, svar):
+        self.svar, self.anrop, self.messages = svar, 0, self
+
+    def create(self, **kw):
+        self.anrop += 1
+        block = type("B", (), {"type": "text", "text": self.svar})()
+        return type("R", (), {"content": [type("T", (), {"type": "thinking"})(), block]})()
+
+
+def test_insikter_tolkas_ar_privata_och_har_tak(anv, monkeypatch):
+    from api import insikt as ins
+    idag_d = datetime.datetime.now(datetime.timezone.utc).date()
+    idag = idag_d.isoformat()
+    plan = {"titel": "Justerat", "pass": [{"datum": idag, "kategori": "running", "titel": "Lugnt 30 min",
+                                           "steg": [{"typ": "lugnt", "min": 30, "zon": "zon 2"}]}]}
+    falsk = _FalskInsiktKlient('Här: {"rubrik": "Ta det lugnt idag", "text": "HRV under baslinjen.", '
+                               '"rekommendation": "justera", "plan": ' + json.dumps(plan) + '}')
+    monkeypatch.setattr(ins, "get_context", lambda **kw: "testkontext")
+    monkeypatch.setattr(ins.anthropic, "Anthropic", lambda **kw: falsk)
+
+    # Saknas → skapas vid första anropet; tre genereringar per dag, sedan stopp utan modellanrop
+    for i in range(3):
+        r = klient.post("/api/insikt/morgon", json={"datum": idag}, headers=rubrik(anv["ta"]))
+        assert r.status_code == 200, r.text
+    assert r.json()["antal"] == 3 and r.json()["plan"]["pass"][0]["titel"] == "Lugnt 30 min"
+    assert klient.post("/api/insikt/morgon", json={"datum": idag}, headers=rubrik(anv["ta"])).status_code == 429
+    assert falsk.anrop == 3
+
+    a = klient.get(f"/api/insikt?datum={idag}", headers=rubrik(anv["ta"])).json()
+    assert a["morgon"]["rubrik"] == "Ta det lugnt idag" and a["morgon"]["rekommendation"] == "justera"
+    # B ser inte A:s insikt
+    assert klient.get(f"/api/insikt?datum={idag}", headers=rubrik(anv["tb"])).json()["morgon"] is None
+    assert klient.post("/api/insikt/morgon", json={"datum": "2020-01-01"}, headers=rubrik(anv["tb"])).status_code == 422
+
+    # Schemalagd skapa() gör inget om insikten redan finns
+    assert ins.skapa(anv["a_id"], "morgon", idag_d, "schema", klient=falsk) is None and falsk.anrop == 3
+
+
+def test_insikt_tolkning():
+    from api.insikt import _tolka
+    # Ogiltig plan och plan för flera dagar tas bort; okänd rekommendation blir "fritt"; vila har aldrig plan
+    ogiltig = '{"rubrik": "R", "text": "T", "rekommendation": "kör hårt", "plan": {"titel": "x", "pass": [{"datum": "2026-11-10", "kategori": "raket", "titel": "x"}]}}'
+    assert _tolka(ogiltig, "morgon") == {"rubrik": "R", "text": "T", "rekommendation": "fritt", "plan": None}
+    vila = '{"rubrik": "R", "text": "T", "rekommendation": "vila", "plan": {"titel": "x", "pass": [{"datum": "2026-11-10", "kategori": "running", "titel": "x"}]}}'
+    assert _tolka(vila, "morgon")["plan"] is None
+    v = _tolka('{"rubrik": "Bra vecka", "text": "T", "hojdpunkter": ["a", "b", "c", "d"], "fokus": "F"}', "vecka")
+    assert v["hojdpunkter"] == ["a", "b", "c"] and v["fokus"] == "F"
+    with pytest.raises(Exception):
+        _tolka("inget json här", "morgon")
+
+
+def test_insiktsfel_faller_inte_synken(monkeypatch, capsys):
+    from api import insikt as ins
+    from api.routes import sync as sync_route
+    def kraschar(*a, **kw):
+        raise RuntimeError("API nere")
+    monkeypatch.setattr(ins, "skapa", kraschar)
+    sync_route.skapa_insikter(1, "schema", söndag=True)   # får inte kasta
+    assert "INSIKT FEL" in capsys.readouterr().out
 
 
 def test_bygg_historik():
