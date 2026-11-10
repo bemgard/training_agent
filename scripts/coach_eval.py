@@ -108,7 +108,7 @@ SCENARIER = [
                              "  Kan träna: mån, tis, tor, lör, sön",
                              "  Atletens anteckning: Säsongen slut, vill bygga volym i gymmet och för lungorna"]),
      "fråga": "Gör ett schema för nästa vecka.",
-     "krav": "Schemat har exakt 3 konditionspass och 2 styrkepass, lagda ENBART på mån, tis, tor, lör och sön (inga pass ons eller fre). Styrkepassen är helkropp/basövningar. Inget tungt benpass dagen före ett kvalitetspass i löpning. Volymen är rimlig för grundträning (inte toppning/tävlingsfokus)."},
+     "krav": "Schemat har exakt 3 konditionspass och 2 styrkepass, lagda ENBART på mån, tis, tor, lör och sön (inga pass ons eller fre). Styrkepassen bygger på basövningar och täcker tillsammans hela kroppen över veckan (en uppdelning, t.ex. ett lättare benpass dagen efter långpass, är ok om den är motiverad). Inget tungt benpass dagen före ett kvalitetspass i löpning. Volymen är rimlig för grundträning (inte toppning/tävlingsfokus)."},
     {"id": "mal_lopp_orealistiskt", "namn": "Orealistisk måltid för lopp",
      "kontext": kontext(mål=["  Lopp: Stockholm halvmaraton", "  Loppdag: 2026-12-06 (26 dagar kvar, ≈ 4 veckor)",
                              "  Distans: 21.1 km | måltid 1:20:00", "  Önskad fördelning per vecka: 4 konditionspass + 0 styrkepass"]),
