@@ -71,14 +71,6 @@ def bygg_historik(rader):
         ut.pop(0)
     return ut
 
-class SparaPassRequest(BaseModel):
-    datum: str
-    typ: str
-    distans_km: float = None
-    tempo: str = None
-    pulszon: str = None
-    syfte: str = None
-
 def get_system_prompt() -> str:
     prompt_path = Path(__file__).parent.parent.parent / "coach" / "system_prompt.txt"
     with open(prompt_path) as f:
@@ -89,17 +81,6 @@ def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Inte inloggad")
     token = authorization.split(" ")[1]
     return verifiera_token(token)
-
-@router.post("/save-pass")
-def save_pass(req: SparaPassRequest, db=Depends(get_db), user=Depends(get_current_user)):
-    ph = "?" if USE_SQLITE else "%s"
-    c = db.cursor()
-    c.execute(f"""
-        INSERT INTO planerade_pass (user_id, datum, typ, distans_km, tempo, pulszon, syfte)
-        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
-    """, (user["user_id"], req.datum, req.typ, req.distans_km, req.tempo, req.pulszon, req.syfte))
-    db.commit()
-    return {"ok": True}
 
 @router.post("/samtal")
 def skapa_samtal(req: NyttSamtal, db=Depends(get_db), user=Depends(get_current_user)):

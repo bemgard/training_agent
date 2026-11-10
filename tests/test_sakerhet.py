@@ -134,7 +134,9 @@ def test_ser_inte_annans_data(anv):
     b_profil = klient.get("/api/profile", headers=rubrik(anv["tb"])).json()
     assert b_profil["aktiviteter"] == []
     assert klient.get("/api/kropp", headers=rubrik(anv["tb"])).json()["matningar"] == []
-    assert klient.get("/api/passes", headers=rubrik(anv["tb"])).json() == []
+    idag = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    vecka = klient.get(f"/api/planer/vecka?start=2026-11-16&idag={idag}", headers=rubrik(anv["tb"])).json()
+    assert all(d["pass"] == [] and d["ovriga"] == [] for d in vecka["dagar"])
     assert klient.get("/api/trender?dagar=0", headers=rubrik(anv["tb"])).json()["volym"] == []
 
 
@@ -280,6 +282,93 @@ def test_samtal_ar_privata(anv, monkeypatch):
 
     assert klient.delete(f"/api/samtal/{s_id}", headers=rubrik(anv["ta"])).status_code == 200
     assert klient.get(f"/api/samtal/{s_id}", headers=rubrik(anv["ta"])).status_code == 404
+
+
+def _plan(start, antal=3):
+    pass_ = []
+    for i in range(antal):
+        d = (start + datetime.timedelta(days=i * 2)).isoformat()
+        if i % 2 == 0:
+            pass_.append({"datum": d, "kategori": "running", "titel": f"Intervaller {i}", "syfte": "Höja tröskeln",
+                          "duration_min": 50, "distans_km": 9, "pulszon": "zon 4",
+                          "steg": [{"typ": "uppvarmning", "min": 15, "zon": "zon 1"},
+                                   {"typ": "intervall", "antal": 5, "min": 4, "zon": "zon 4", "tempo": "4:45/km", "vila_min": 2}]})
+        else:
+            pass_.append({"datum": d, "kategori": "strength_training", "titel": f"Helkropp {i}", "duration_min": 45,
+                          "ovningar": [{"namn": "Knäböj", "set": 3, "reps": "8", "belastning": "RPE 7", "vila_s": 120}]})
+    return {"titel": "Basvecka", "sammanfattning": "Bygga volym", "pass": pass_}
+
+
+def test_planer_sparas_stams_av_och_ar_privata(anv):
+    idag_d = datetime.datetime.now(datetime.timezone.utc).date()
+    idag = idag_d.isoformat()
+    nästa_mån = idag_d + datetime.timedelta(days=7 - idag_d.weekday())
+    r = klient.post("/api/planer", json={"plan": _plan(nästa_mån), "idag": idag}, headers=rubrik(anv["ta"]))
+    assert r.status_code == 200 and r.json()["antal"] == 3, r.text
+    v = klient.get(f"/api/planer/vecka?start={nästa_mån.isoformat()}&idag={idag}", headers=rubrik(anv["ta"])).json()
+    alla = [p for d in v["dagar"] for p in d["pass"]]
+    assert len(alla) == 3 and v["plan"]["titel"] == "Basvecka" and v["summering"]["planerade"] == 3
+    assert alla[0]["steg"][1]["antal"] == 5 and alla[1]["ovningar"][0]["namn"] == "Knäböj"
+    assert all(p["status"] == "kommande" for p in alla)
+
+    # Ny plan för samma vecka ersätter de ogjorda passen i stället för att lägga dubbelt
+    klient.post("/api/planer", json={"plan": _plan(nästa_mån, 2), "idag": idag}, headers=rubrik(anv["ta"]))
+    v = klient.get(f"/api/planer/vecka?start={nästa_mån.isoformat()}&idag={idag}", headers=rubrik(anv["ta"])).json()
+    alla = [p for d in v["dagar"] for p in d["pass"]]
+    assert len(alla) == 2
+
+    # B ser inte A:s plan och kan varken flytta eller ta bort A:s pass
+    vb = klient.get(f"/api/planer/vecka?start={nästa_mån.isoformat()}&idag={idag}", headers=rubrik(anv["tb"])).json()
+    assert vb["plan"] is None and all(d["pass"] == [] for d in vb["dagar"])
+    pid = alla[0]["id"]
+    ny_dag = (nästa_mån + datetime.timedelta(days=1)).isoformat()
+    assert klient.patch(f"/api/passes/{pid}", json={"idag": idag, "datum": ny_dag}, headers=rubrik(anv["tb"])).status_code == 404
+    assert klient.delete(f"/api/passes/{pid}", headers=rubrik(anv["tb"])).status_code == 404
+    assert klient.patch(f"/api/passes/{pid}", json={"idag": idag, "datum": ny_dag}, headers=rubrik(anv["ta"])).status_code == 200
+    # Planen får inte kopplas till någon annans samtal
+    b_samtal = klient.post("/api/samtal", json={}, headers=rubrik(anv["tb"])).json()["id"]
+    assert klient.post("/api/planer", json={"plan": _plan(nästa_mån), "idag": idag, "samtal_id": b_samtal},
+                       headers=rubrik(anv["ta"])).status_code == 404
+
+
+def test_planer_avstams_mot_garmin(anv):
+    idag_d = datetime.datetime.now(datetime.timezone.utc).date()
+    db = sqlite3.connect(DB_FIL)
+    db.execute("INSERT INTO activities (user_id, activity_id, datum, typ, distans_km, duration_min, snitt_puls) "
+               "VALUES (?, 999777, ?, 'running', 8.6, 48, 152)", (anv["a_id"], idag_d.isoformat()))
+    db.commit(); db.close()
+    plan = {"titel": "Idag", "pass": [{"datum": idag_d.isoformat(), "kategori": "running", "titel": "Tröskel", "distans_km": 9}]}
+    assert klient.post("/api/planer", json={"plan": plan, "idag": idag_d.isoformat()}, headers=rubrik(anv["ta"])).status_code == 200
+    v = klient.get(f"/api/planer/vecka?start={idag_d.isoformat()}&idag={idag_d.isoformat()}", headers=rubrik(anv["ta"])).json()
+    dag = next(d for d in v["dagar"] if d["datum"] == idag_d.isoformat())
+    assert dag["pass"][0]["status"] == "genomford" and dag["pass"][0]["utfort"]["distans_km"] == 8.6
+    # Ett genomfört pass skrivs inte över när en ny plan sparas för samma dag
+    klient.post("/api/planer", json={"plan": {**plan, "pass": [{**plan["pass"][0], "titel": "Nytt"}]}, "idag": idag_d.isoformat()},
+                headers=rubrik(anv["ta"]))
+    v = klient.get(f"/api/planer/vecka?start={idag_d.isoformat()}&idag={idag_d.isoformat()}", headers=rubrik(anv["ta"])).json()
+    titlar = {p["titel"]: p["status"] for d in v["dagar"] for p in d["pass"]}
+    assert titlar.get("Tröskel") == "genomford" and "Nytt" in titlar
+
+
+def test_plan_validering(anv):
+    idag_d = datetime.datetime.now(datetime.timezone.utc).date()
+    idag = idag_d.isoformat()
+    bas = {"datum": (idag_d + datetime.timedelta(days=2)).isoformat(), "kategori": "running", "titel": "x"}
+    fel = [
+        {"titel": "x", "pass": []},
+        {"titel": "x", "pass": [{**bas, "kategori": "raketsport"}]},
+        {"titel": "x", "pass": [{**bas, "datum": "2020-01-01"}]},
+        {"titel": "x", "pass": [{**bas, "datum": (idag_d + datetime.timedelta(days=60)).isoformat()}]},
+        {"titel": "x", "pass": [bas, {**bas, "datum": (idag_d + datetime.timedelta(days=20)).isoformat()}]},  # > 14 dagar
+        {"titel": "x", "pass": [{**bas, "steg": [{"typ": "teleportering"}]}]},
+        {"titel": "x", "pass": [{**bas, "ovningar": [{"namn": "Knäböj", "set": 99, "reps": "8"}]}]},
+        {"titel": "x", "pass": [bas] * 22},
+        {"titel": "x" * 101, "pass": [bas]},
+    ]
+    for plan in fel:
+        assert klient.post("/api/planer", json={"plan": plan, "idag": idag}, headers=rubrik(anv["tb"])).status_code == 422, plan
+    assert klient.post("/api/planer", json={"plan": {"titel": "x", "pass": [bas]}, "idag": "2020-01-01"},
+                       headers=rubrik(anv["tb"])).status_code == 422
 
 
 def test_bygg_historik():

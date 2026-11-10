@@ -1,156 +1,121 @@
 import { useState, useEffect } from "react"
-import { fetchPasses, deletePass } from "../api"
+import { ChevronLeft, ChevronRight, CalendarDays, Trash2, MessageCircle } from "lucide-react"
+import { fetchVecka, flyttaPass, deletePass } from "../api"
+import { lokaltDatum, kategoriInfo, formatMinuter } from "../aktivitetstyper"
+import PlanPass from "./PlanPass"
 import MalKort from "./MalKort"
 import OmMigKort from "./OmMigKort"
 
-const colors = {
-  bg: "#0a0a0f",
-  card: "#1a1a26",
-  cardGreen: "#1a3a2e",
-  border: "#2a2a3a",
-  borderGreen: "#6ee7b740",
-  text: "#e2e8f0",
-  muted: "#64748b",
-  accent: "#6ee7b7",
+const C = { surface: "#161b25", border: "#232a38", text: "#f1f5f9", sub: "#94a3b8", muted: "#64748b", accent: "#6ee7b7" }
+const knapp = { background: "none", border: `1px solid ${C.border}`, color: C.sub, borderRadius: 8, padding: "5px 9px", cursor: "pointer", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }
+
+function måndag(d) {
+  const x = new Date(d)
+  x.setHours(12, 0, 0, 0)
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
+  return x
 }
 
-function PassCard({ pass, onDelete }) {
-  const [bekraftar, setBekraftar] = useState(false)
+function PassÅtgärder({ pass, idag, onÄndrat }) {
+  const [datum, setDatum] = useState(pass.datum)
+  const [fel, setFel] = useState("")
+  if (pass.status === "genomford") return null
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
+      <input type="date" value={datum} onChange={e => setDatum(e.target.value)}
+        style={{ background: "#0f131b", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 8px", fontSize: 12 }} />
+      <button style={knapp} disabled={datum === pass.datum} onClick={async () => {
+        const r = await flyttaPass(pass.id, datum, idag)
+        if (!r.ok) return setFel("Kunde inte flytta passet")
+        onÄndrat()
+      }}><CalendarDays size={13} /> Flytta</button>
+      <button style={knapp} onClick={async () => { await deletePass(pass.id); onÄndrat() }}><Trash2 size={13} /> Ta bort</button>
+      {fel && <span style={{ color: "#f87171", fontSize: 12 }}>{fel}</span>}
+    </div>
+  )
+}
 
-  async function handleDelete() {
-    setBekraftar(true)
-    await onDelete(pass.id)
-  }
+function Veckovy({ onChatWithGoal }) {
+  const idag = lokaltDatum(new Date())
+  const [start, setStart] = useState(() => måndag(new Date()))
+  const [data, setData] = useState(null)
+  const ladda = () => fetchVecka(lokaltDatum(start), idag).then(setData)
+  useEffect(() => { ladda() }, [start])
+
+  const flytta = veckor => { const d = new Date(start); d.setDate(d.getDate() + veckor * 7); setStart(d) }
+  const slut = new Date(start); slut.setDate(slut.getDate() + 6)
+  const fmt = d => d.toLocaleDateString("sv-SE", { day: "numeric", month: "short" })
+  const ärDennaVecka = lokaltDatum(måndag(new Date())) === lokaltDatum(start)
+  const s = data?.summering
+  const harPass = s && s.planerade > 0
 
   return (
-    <div style={{
-      background: colors.card,
-      border: `1px solid ${colors.border}`,
-      borderRadius: 12,
-      padding: "16px 20px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      gap: 16,
-    }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: colors.accent }}>
-            {pass.datum}
-          </span>
-          <span style={{
-            background: "#0f2a1e",
-            border: `1px solid ${colors.borderGreen}`,
-            color: colors.accent,
-            borderRadius: 6,
-            padding: "2px 8px",
-            fontSize: 11,
-            fontWeight: 500,
-          }}>
-            {pass.typ}
-          </span>
-          {pass.pulszon && (
-            <span style={{ fontSize: 11, color: colors.muted }}>
-              {pass.pulszon}
-            </span>
-          )}
-        </div>
-        <div style={{ display: "flex", gap: 20, fontSize: 13, color: colors.text, marginBottom: pass.syfte ? 6 : 0 }}>
-          {pass.distans_km && (
-            <span>{pass.distans_km} km</span>
-          )}
-          {pass.tempo && (
-            <span>{pass.tempo}</span>
-          )}
-        </div>
-        {pass.syfte && (
-          <div style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
-            {pass.syfte}
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "18px 22px", marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <CalendarDays size={18} color={C.accent} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+            {ärDennaVecka ? "Den här veckan" : `Vecka ${fmt(start)} – ${fmt(slut)}`}
           </div>
-        )}
+          {data?.plan && <div style={{ fontSize: 12.5, color: C.sub, marginTop: 2 }}>{data.plan.titel}{data.plan.sammanfattning ? ` — ${data.plan.sammanfattning}` : ""}</div>}
+        </div>
+        <button style={knapp} onClick={() => flytta(-1)} title="Föregående vecka"><ChevronLeft size={14} /></button>
+        {!ärDennaVecka && <button style={knapp} onClick={() => setStart(måndag(new Date()))}>Idag</button>}
+        <button style={knapp} onClick={() => flytta(1)} title="Nästa vecka"><ChevronRight size={14} /></button>
       </div>
-      <button
-        onClick={handleDelete}
-        disabled={bekraftar}
-        style={{
-          background: "transparent",
-          border: `1px solid ${colors.border}`,
-          color: colors.muted,
-          borderRadius: 8,
-          padding: "6px 10px",
-          cursor: bekraftar ? "not-allowed" : "pointer",
-          fontSize: 13,
-          flexShrink: 0,
-        }}
-      >
-        ✕
-      </button>
+
+      {harPass && (
+        <div style={{ display: "flex", gap: 18, marginTop: 14, fontSize: 12.5, color: C.sub }}>
+          <span><b style={{ color: C.accent, fontSize: 15 }}>{s.genomforda}</b> av {s.planerade} pass genomförda</span>
+          {s.missade > 0 && <span style={{ color: "#f87171" }}>{s.missade} missade</span>}
+          <span>Planerat {formatMinuter(s.planerad_min)} · tränat {formatMinuter(s.utford_min)}</span>
+        </div>
+      )}
+
+      {!data ? null : !harPass && data.dagar.every(d => d.ovriga.length === 0) ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, padding: "14px 16px", background: "#0f131b", borderRadius: 10 }}>
+          <div style={{ flex: 1, fontSize: 13, color: C.sub }}>Ingen plan för veckan. Be coachen om ett schema och spara det härifrån chatten.</div>
+          <button onClick={() => onChatWithGoal("Gör en veckoplan för den här veckan utifrån mitt mål, min dagsform och belastning.")}
+            style={{ ...knapp, color: C.accent, border: `1px solid ${C.accent}60` }}><MessageCircle size={13} /> Be om veckoplan</button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 14 }}>
+          {data.dagar.map(d => {
+            const dag = new Date(d.datum + "T12:00:00")
+            const ärIdag = d.datum === idag
+            return (
+              <div key={d.datum} style={{ display: "grid", gridTemplateColumns: "76px 1fr", gap: 12, padding: "8px 0", borderTop: `1px solid ${C.border}` }}>
+                <div style={{ paddingTop: 8 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: ärIdag ? "#fbbf24" : C.text, textTransform: "capitalize" }}>{dag.toLocaleDateString("sv-SE", { weekday: "short" })}</div>
+                  <div style={{ fontSize: 11, color: C.muted }}>{fmt(dag)}</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {d.pass.length === 0 && d.ovriga.length === 0 && <div style={{ fontSize: 12, color: C.muted, paddingTop: 9 }}>Vila</div>}
+                  {d.pass.map(p => <PlanPass key={p.id} pass={p} åtgärder={<PassÅtgärder pass={p} idag={idag} onÄndrat={ladda} />} />)}
+                  {d.ovriga.map(a => {
+                    const k = kategoriInfo(a.kategori)
+                    return (
+                      <div key={a.activity_id} style={{ fontSize: 12, color: C.sub, padding: "4px 2px" }}>
+                        {k.ikon} Oplanerat: {a.namn || k.namn} · {formatMinuter(a.duration_min)}{a.distans_km >= 1 ? ` · ${a.distans_km} km` : ""}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
 
 export default function TraningsPlan({ onChatWithGoal }) {
-  const [passes, setPasses] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchPasses()
-      .then(setPasses)
-      .finally(() => setLoading(false))
-  }, [])
-
-  async function handleDelete(id) {
-    await deletePass(id)
-    setPasses(prev => prev.filter(p => p.id !== id))
-  }
-
-  const grouped = passes.reduce((acc, p) => {
-    const month = p.datum?.slice(0, 7) ?? "Okänt"
-    if (!acc[month]) acc[month] = []
-    acc[month].push(p)
-    return acc
-  }, {})
-
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ maxWidth: 760, margin: "0 auto" }}>
       <MalKort onChatWithGoal={onChatWithGoal} />
+      <Veckovy onChatWithGoal={onChatWithGoal} />
       <OmMigKort />
-
-      {loading ? (
-        <div style={{ color: colors.muted, textAlign: "center", marginTop: 40 }}>
-          Laddar pass...
-        </div>
-      ) : passes.length === 0 ? (
-        <div style={{ textAlign: "center", color: colors.muted, marginTop: 60 }}>
-          <div style={{ fontSize: 28, marginBottom: 12 }}>📅</div>
-          <div style={{ fontSize: 14 }}>Inga sparade pass ännu.</div>
-          <div style={{ fontSize: 12, marginTop: 6 }}>
-            Spara pass från AI-coachen eller be den om en plan utifrån ditt mål ovan.
-          </div>
-        </div>
-      ) : (
-        Object.entries(grouped)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([month, monthPasses]) => (
-            <div key={month} style={{ marginBottom: 28 }}>
-              <div style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: colors.muted,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                marginBottom: 10,
-              }}>
-                {new Date(month + "-15").toLocaleDateString("sv-SE", { month: "long", year: "numeric" })}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {monthPasses.map(p => (
-                  <PassCard key={p.id} pass={p} onDelete={handleDelete} />
-                ))}
-              </div>
-            </div>
-          ))
-      )}
     </div>
   )
 }

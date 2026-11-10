@@ -6,6 +6,7 @@ try:
     from scripts.aktivitetstyp import effektiv_typ, hämta_regler, KATEGORIER
     from scripts.atletprofil import beskriv as beskriv_atlet
     from scripts.dagsform import beskriv as beskriv_dagsform, sjukvarning
+    from scripts.plan import stäm_av, beskriv as beskriv_plan
     from scripts.kropp import beräkna as beräkna_kropp
     from scripts.belastning import daglig_serie, maxpuls as maxpuls_belastning
     from scripts.mal import beskriv as beskriv_mål
@@ -13,6 +14,7 @@ except ImportError:
     from aktivitetstyp import effektiv_typ, hämta_regler, KATEGORIER
     from atletprofil import beskriv as beskriv_atlet
     from dagsform import beskriv as beskriv_dagsform, sjukvarning
+    from plan import stäm_av, beskriv as beskriv_plan
     from kropp import beräkna as beräkna_kropp
     from belastning import daglig_serie, maxpuls as maxpuls_belastning
     from mal import beskriv as beskriv_mål
@@ -245,6 +247,24 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
         if varning and (idag_datum - datetime.strptime(varning["datum"], "%Y-%m-%d").date()).days > 1:
             varning = None
 
+    plan_pass, plan_extra, plan_titel = [], [], None
+    if user_id:
+        p_från, p_till = (idag_datum - timedelta(days=7)).isoformat(), (idag_datum + timedelta(days=7)).isoformat()
+        k = ["id", "datum", "kategori", "typ", "titel", "duration_min", "distans_km", "pulszon", "tempo", "activity_id"]
+        c.execute(f"SELECT {', '.join(k)} FROM planerade_pass WHERE user_id = {ph} AND datum >= {ph} AND datum <= {ph} ORDER BY datum",
+                  (user_id, p_från, p_till))
+        planerade = [dict(zip(k, r)) for r in c.fetchall()]
+        k = ["activity_id", "datum", "namn", "typ", "plats", "distans_km", "duration_min", "snitt_puls", "typ_manuell"]
+        c.execute(f"SELECT {', '.join(k)} FROM activities WHERE user_id = {ph} AND datum >= {ph} AND datum <= {ph}",
+                  (user_id, p_från, idag_datum.isoformat()))
+        plan_pass, plan_extra = stäm_av(planerade, [dict(zip(k, r)) for r in c.fetchall()], idag_datum, regler)
+        if not planerade:
+            plan_extra = []  # utan plan finns inget att stämma av mot — passen syns redan i övriga avsnitt
+        c.execute(f"SELECT titel FROM traningsplaner WHERE user_id = {ph} AND till_datum >= {ph} ORDER BY id DESC LIMIT 1",
+                  (user_id, idag_datum.isoformat()))
+        rad = c.fetchone()
+        plan_titel = rad[0] if rad else None
+
     kropp = []
     kroppsprofil = (None, None, None)
     if user_id:
@@ -265,6 +285,9 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
 
     lines.append("\nDAGSFORM (självrapporterat av atleten — väger TYNGRE än klockans data, se reglerna för dagsform):")
     lines.extend(beskriv_dagsform(rapporter, besvär, varning, idag_datum))
+
+    lines.append("\nVECKANS PLAN (sparade pass senaste 7 dagarna och kommande 7, avstämda mot Garmin):")
+    lines.extend(beskriv_plan(plan_pass, plan_extra, plan_titel, idag_datum))
 
     lines.append("\nOM ATLETEN (atletens egna uppgifter — respektera skador, utrustning och preferenser):")
     lines.extend(beskriv_atlet(atlet, regler, KATEGORIER))

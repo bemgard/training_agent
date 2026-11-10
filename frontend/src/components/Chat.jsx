@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react"
-import { hämtaToken } from "../token"
 import { Send, Plus, Trash2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
-import { streamChat, skapaSamtal, fetchSamtalLista, fetchSamtal, taBortSamtal } from "../api"
+import { streamChat, skapaSamtal, fetchSamtalLista, fetchSamtal, taBortSamtal, sparaPlan } from "../api"
+import { lokaltDatum } from "../aktivitetstyper"
+import PlanPass from "./PlanPass"
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
 const RUNNER_CSS = `
 @keyframes runner-bounce {
@@ -32,37 +32,67 @@ function RunnerLoading() {
   )
 }
 
-function extractPass(content) {
-  const match = content.match(/\[PASS\](.*?)\[\/PASS\]/s)
+function extractPlan(content) {
+  const match = content.match(/\[PLAN\]([\s\S]*?)\[\/PLAN\]/)
   if (!match) return null
   try {
-    return JSON.parse(match[1])
+    const plan = JSON.parse(match[1])
+    return Array.isArray(plan.pass) && plan.pass.length ? plan : null
   } catch {
     return null
   }
 }
 
-function ChatMessage({ role, content }) {
-  const [sparat, setSparat] = useState(false)
-  const pass = role === "assistant" ? extractPass(content) : null
-  const visningsText = content.replace(/\[PASS\].*?\[\/PASS\]/s, "").trim()
+function PlanFörhandsvisning({ plan, samtalId }) {
+  const [läge, setLäge] = useState("ny")  // ny | sparar | sparad | fel
+  const [info, setInfo] = useState("")
+  const pass = [...plan.pass].sort((a, b) => a.datum.localeCompare(b.datum))
 
-  async function sparaPass() {
-    const token = hämtaToken()
-    try {
-      await fetch(`${API}/save-pass`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(pass)
-      })
-      setSparat(true)
-    } catch {
-      // tyst fel, knappen förblir klickbar
+  async function spara() {
+    setLäge("sparar")
+    const r = await sparaPlan(plan, lokaltDatum(new Date()), samtalId)
+    if (!r.ok) {
+      setLäge("fel")
+      setInfo(typeof r.data?.detail === "string" ? r.data.detail : "Planen följde inte formatet — be coachen göra om den.")
+      return
     }
+    setLäge("sparad")
+    setInfo(r.data.ersatta ? `${r.data.ersatta} tidigare planerade pass ersattes.` : "")
   }
+
+  return (
+    <div style={{ marginTop: 12, borderTop: "1px solid #2a2a3a", paddingTop: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        {plan.titel} · {pass.length} pass
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {pass.map((p, i) => (
+          <div key={i}>
+            <div style={{ fontSize: 11, color: "#64748b", margin: "2px 0 3px", textTransform: "capitalize" }}>
+              {new Date(p.datum + "T12:00:00").toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "short" })}
+            </div>
+            <PlanPass pass={p} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+        <button onClick={spara} disabled={läge === "sparar" || läge === "sparad"} style={{
+          background: läge === "sparad" ? "#12121a" : "#1a3a2e", border: `1px solid ${läge === "sparad" ? "#2a2a3a" : "#6ee7b760"}`,
+          color: läge === "sparad" ? "#64748b" : "#6ee7b7", padding: "7px 14px", borderRadius: 8,
+          cursor: läge === "sparad" ? "default" : "pointer", fontSize: 12.5, fontWeight: 600,
+        }}>
+          {läge === "sparad" ? "✓ Sparad i Träningsplan" : läge === "sparar" ? "Sparar…" : pass.length > 1 ? "📅 Spara veckoplan" : `📅 Spara pass — ${pass[0].datum}`}
+        </button>
+        {info && <span style={{ fontSize: 12, color: läge === "fel" ? "#f87171" : "#64748b" }}>{info}</span>}
+      </div>
+    </div>
+  )
+}
+
+function ChatMessage({ role, content, samtalId, strömmar }) {
+  const plan = role === "assistant" && !strömmar ? extractPlan(content) : null
+  // Dölj blocket (även ett halvfärdigt under strömning) och det gamla [PASS]-formatet i äldre samtal
+  const visningsText = content.replace(/\[PLAN\][\s\S]*?(\[\/PLAN\]|$)/, "").replace(/\[PASS\][\s\S]*?\[\/PASS\]/, "").trim()
 
   return (
     <div style={{
@@ -71,7 +101,8 @@ function ChatMessage({ role, content }) {
       marginBottom: 16,
     }}>
       <div className="message-bubble" style={{
-        maxWidth: "75%",
+        maxWidth: plan ? "90%" : "75%",
+        width: plan ? "90%" : undefined,
         background: role === "user" ? "#1a3a2e" : "#1a1a26",
         border: `1px solid ${role === "user" ? "#6ee7b740" : "#2a2a3a"}`,
         borderRadius: role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
@@ -81,20 +112,7 @@ function ChatMessage({ role, content }) {
         lineHeight: 1.6,
       }}>
         <ReactMarkdown>{visningsText}</ReactMarkdown>
-        {pass && (
-          <button onClick={sparaPass} disabled={sparat} style={{
-            marginTop: 10,
-            background: sparat ? "#12121a" : "#1a3a2e",
-            border: `1px solid ${sparat ? "#2a2a3a" : "#6ee7b760"}`,
-            color: sparat ? "#64748b" : "#6ee7b7",
-            padding: "6px 12px",
-            borderRadius: 8,
-            cursor: sparat ? "default" : "pointer",
-            fontSize: 12,
-          }}>
-            {sparat ? "✓ Sparat" : `📅 Spara pass — ${pass.datum}`}
-          </button>
-        )}
+        {plan && <PlanFörhandsvisning plan={plan} samtalId={samtalId} />}
       </div>
     </div>
   )
@@ -234,7 +252,7 @@ export default function Chat({ initialInput = "", onInitialInputConsumed }) {
         {messages.map((m, i) => {
           if (streaming && i === messages.length - 1 && m.role === "assistant" && m.content === "")
             return <RunnerLoading key={i} />
-          return <ChatMessage key={i} {...m} />
+          return <ChatMessage key={i} {...m} samtalId={samtalId} strömmar={streaming && i === messages.length - 1} />
         })}
         <div ref={chatEndRef} />
       </div>

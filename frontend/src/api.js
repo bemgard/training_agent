@@ -53,14 +53,26 @@ export async function loginUser(email, lösenord, kom_ihag = false) {
     return { ok: res.ok, data: await res.json() }
 }
 
-export async function fetchPasses() {
-    const res = await fetch(`${API}/passes`, { headers: getHeaders() })
-    return res.json()
+export async function fetchVecka(start, idag) {
+    const res = await fetch(`${API}/planer/vecka?start=${start}&idag=${idag}`, { headers: getHeaders() })
+    return res.ok ? res.json() : null
+}
+
+export async function sparaPlan(plan, idag, samtalId) {
+    const res = await fetch(`${API}/planer`, {
+        method: "POST", headers: getHeaders(), body: JSON.stringify({ plan, idag, samtal_id: samtalId ?? null })
+    })
+    return { ok: res.ok, data: await res.json() }
+}
+
+export async function flyttaPass(id, datum, idag) {
+    const res = await fetch(`${API}/passes/${id}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ datum, idag }) })
+    return { ok: res.ok }
 }
 
 export async function deletePass(id) {
     const res = await fetch(`${API}/passes/${id}`, { method: "DELETE", headers: getHeaders() })
-    return res.json()
+    return { ok: res.ok }
 }
 
 export async function registerUser(email, lösenord, garmin_email, garmin_password) {
