@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { ChevronLeft, ChevronRight, CalendarDays, Trash2, MessageCircle, Watch } from "lucide-react"
-import { fetchVecka, flyttaPass, deletePass, skickaTillGarmin, taBortFrånGarmin } from "../api"
+import { fetchVecka, flyttaPass, deletePass, skickaTillGarmin, taBortFrånGarmin, taBortPlan } from "../api"
 import { lokaltDatum, kategoriInfo, formatMinuter } from "../aktivitetstyper"
 import PlanPass from "./PlanPass"
 import MalKort from "./MalKort"
@@ -98,6 +98,13 @@ function Veckovy({ onChatWithGoal }) {
             {ärDennaVecka ? "Den här veckan" : `Vecka ${fmt(start)} – ${fmt(slut)}`}
           </div>
           {data?.plan && <div style={{ fontSize: 12.5, color: C.sub, marginTop: 2 }}>{data.plan.titel}{data.plan.sammanfattning ? ` — ${data.plan.sammanfattning}` : ""}</div>}
+          {data?.plan && (
+            <button style={{ ...knapp, marginTop: 8, color: "#f87171", border: "1px solid #f8717140" }} onClick={async () => {
+              if (!confirm(`Ta bort planen "${data.plan.titel}" och alla dess pass? Pass som skickats till Garmin tas bort där också. Dina genomförda Garmin-aktiviteter påverkas inte.`)) return
+              await taBortPlan(data.plan.id)
+              ladda()
+            }}><Trash2 size={13} /> Ta bort planen</button>
+          )}
         </div>
         <button style={knapp} onClick={() => flytta(-1)} title="Föregående vecka"><ChevronLeft size={14} /></button>
         {!ärDennaVecka && <button style={knapp} onClick={() => setStart(måndag(new Date()))}>Idag</button>}

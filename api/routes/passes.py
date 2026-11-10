@@ -215,6 +215,25 @@ def vecka(start: str = Query(...), idag: str = Query(...), db=Depends(get_db), u
     }
 
 
+@router.delete("/planer/{plan_id}")
+def ta_bort_plan(plan_id: int, db=Depends(get_db), user=Depends(get_current_user)):
+    """Tar bort planen och alla dess pass (även i Garmin). Genomförda Garmin-aktiviteter påverkas inte —
+    de visas som oplanerade pass i veckovyn efteråt."""
+    uid = user["user_id"]
+    c = db.cursor()
+    c.execute(f"SELECT id FROM traningsplaner WHERE id = {ph} AND user_id = {ph}", (plan_id, uid))
+    if not c.fetchone():
+        raise HTTPException(status_code=404, detail="Planen hittades inte")
+    c.execute(f"SELECT garmin_workout_id FROM planerade_pass WHERE plan_id = {ph} AND user_id = {ph}", (plan_id, uid))
+    garmin = [dict(r)["garmin_workout_id"] for r in c.fetchall()]
+    c.execute(f"DELETE FROM planerade_pass WHERE plan_id = {ph} AND user_id = {ph}", (plan_id, uid))
+    antal = c.rowcount
+    c.execute(f"DELETE FROM traningsplaner WHERE id = {ph} AND user_id = {ph}", (plan_id, uid))
+    db.commit()
+    _städa_garmin(uid, garmin)
+    return {"ok": True, "borttagna_pass": antal}
+
+
 @router.patch("/passes/{pass_id}")
 def ändra_pass(pass_id: int, req: ÄndraPass, db=Depends(get_db), user=Depends(get_current_user)):
     """Flytta ett pass till en annan dag (inom samma gränser som när planen sparas)."""

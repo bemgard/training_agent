@@ -520,6 +520,26 @@ def test_garmin_konvertering():
         till_garmin({"kategori": "strength_training", "titel": "x"})
 
 
+def test_ta_bort_plan(anv, monkeypatch):
+    from api.routes import passes as passes_route
+    städat = []
+    monkeypatch.setattr(passes_route, "_städa_garmin", lambda uid, ids: städat.append([i for i in ids if i]))
+    idag_d = datetime.datetime.now(datetime.timezone.utc).date()
+    idag = idag_d.isoformat()
+    start = idag_d + datetime.timedelta(days=14 - idag_d.weekday())   # om två veckor, krockar inte med andra tester
+    r = klient.post("/api/planer", json={"plan": _plan(start), "idag": idag}, headers=rubrik(anv["ta"])).json()
+    plan_id = r["plan_id"]
+    # B kan inte ta bort A:s plan
+    assert klient.delete(f"/api/planer/{plan_id}", headers=rubrik(anv["tb"])).status_code == 404
+    v = klient.get(f"/api/planer/vecka?start={start.isoformat()}&idag={idag}", headers=rubrik(anv["ta"])).json()
+    assert v["plan"]["id"] == plan_id and v["summering"]["planerade"] == 3
+    r = klient.delete(f"/api/planer/{plan_id}", headers=rubrik(anv["ta"]))
+    assert r.status_code == 200 and r.json()["borttagna_pass"] == 3 and städat
+    v = klient.get(f"/api/planer/vecka?start={start.isoformat()}&idag={idag}", headers=rubrik(anv["ta"])).json()
+    assert v["plan"] is None and v["summering"]["planerade"] == 0
+    assert klient.delete(f"/api/planer/{plan_id}", headers=rubrik(anv["ta"])).status_code == 404
+
+
 def test_bygg_historik():
     from api.routes.chat import bygg_historik
     assert bygg_historik([("assistant", "a"), ("user", "f1"), ("user", "f2"), ("assistant", "s")]) == [

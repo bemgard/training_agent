@@ -220,3 +220,8 @@ export async function taBortFrånGarmin(id) {
     const res = await fetch(`${API}/passes/${id}/garmin`, { method: "DELETE", headers: getHeaders() })
     return { ok: res.ok }
 }
+
+export async function taBortPlan(id) {
+    const res = await fetch(`${API}/planer/${id}`, { method: "DELETE", headers: getHeaders() })
+    return { ok: res.ok }
+}
