@@ -23,8 +23,8 @@ class Steg(BaseModel):
     min: Optional[float] = Field(default=None, gt=0, le=300)
     distans_km: Optional[float] = Field(default=None, gt=0, le=100)
     antal: Optional[int] = Field(default=None, ge=1, le=50)
-    zon: Optional[str] = Field(default=None, max_length=20)
-    tempo: Optional[str] = Field(default=None, max_length=20)
+    zon: Optional[str] = Field(default=None, max_length=30)
+    tempo: Optional[str] = Field(default=None, max_length=40)
     vila_min: Optional[float] = Field(default=None, ge=0, le=30)
     beskrivning: Optional[str] = Field(default=None, max_length=200)
 
@@ -32,8 +32,8 @@ class Steg(BaseModel):
 class Övning(BaseModel):
     namn: str = Field(min_length=1, max_length=80)
     set: int = Field(ge=1, le=10)
-    reps: str = Field(min_length=1, max_length=20)
-    belastning: Optional[str] = Field(default=None, max_length=40)
+    reps: str = Field(min_length=1, max_length=30)
+    belastning: Optional[str] = Field(default=None, max_length=60)
     vila_s: Optional[int] = Field(default=None, ge=0, le=600)
     kommentar: Optional[str] = Field(default=None, max_length=200)
 
@@ -45,8 +45,8 @@ class Pass(BaseModel):
     syfte: Optional[str] = Field(default=None, max_length=400)
     duration_min: Optional[int] = Field(default=None, ge=5, le=400)
     distans_km: Optional[float] = Field(default=None, gt=0, le=100)
-    pulszon: Optional[str] = Field(default=None, max_length=20)
-    tempo: Optional[str] = Field(default=None, max_length=20)
+    pulszon: Optional[str] = Field(default=None, max_length=30)
+    tempo: Optional[str] = Field(default=None, max_length=40)
     steg: List[Steg] = Field(default=[], max_length=20)
     ovningar: List[Övning] = Field(default=[], max_length=20)
 

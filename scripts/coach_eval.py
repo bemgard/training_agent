@@ -216,7 +216,9 @@ def format_kontroller(svar, scenario):
         except json.JSONDecodeError:
             fel.append("[PLAN] ogiltig JSON")
         except Exception as e:
-            fel.append(f"[PLAN] följer inte formatet: {str(e).splitlines()[0]}")
+            detaljer = getattr(e, "errors", lambda: [])()
+            fältfel = "; ".join(f"{'.'.join(map(str, d['loc']))}: {d['msg']}" for d in detaljer[:3]) or str(e).splitlines()[0]
+            fel.append(f"[PLAN] följer inte formatet — {fältfel}")
     if scenario.get("kräver_plan") and not block:
         fel.append("saknar [PLAN]-block")
     if scenario.get("ingen_plan") and block:
