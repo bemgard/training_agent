@@ -1,4 +1,11 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Läs .env innan något annat importeras — auth.py kräver JWT_SECRET och database.py DATABASE_URL vid import.
+# På Render finns ingen .env; där kommer variablerna från miljön och detta gör inget.
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
