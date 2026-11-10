@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import profile, chat, sync, auth as auth_routes, passes, kropp, trender
+from api.routes import profile, chat, sync, auth as auth_routes, passes, kropp, trender, mal
 from api.database import open_conn, USE_SQLITE
 
 @asynccontextmanager
@@ -48,6 +48,7 @@ app.include_router(auth_routes.router, prefix="/api")
 app.include_router(passes.router, prefix="/api")
 app.include_router(kropp.router, prefix="/api")
 app.include_router(trender.router, prefix="/api")
+app.include_router(mal.router, prefix="/api")
 
 @app.get("/")
 def root():

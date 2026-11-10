@@ -24,11 +24,13 @@ IDAG = "2026-11-10 (Tuesday)"
 
 def kontext(readiness=72, niva="MODERATE", faktorer=None, hrv7=95, baslinje=(83, 148), hrv_status="BALANCED",
             hrv_natt=98, akut=520, kronisk=500, acwr=1.04, acwr_zon="optimal", vilopuls=46, sömn="7h40m",
-            sömnpoäng=85, utan_hrv=False):
+            sömnpoäng=85, utan_hrv=False, mål=None):
     """Bygger en kontext i samma format som scripts/context_builder.py."""
     f = faktorer or {"sömn": 80, "sömnhistorik": 78, "återhämtningstid": 85, "belastning": 82, "stresshistorik": 75, "HRV": 80}
     rader = [
-        "=== TRÄNINGSPROFIL ===", f"DAGENS DATUM: {IDAG}", "SENASTE VO2MAX: 55.0 (2026-11-02)",
+        "=== TRÄNINGSPROFIL ===", f"DAGENS DATUM: {IDAG}", "", "ATLETENS MÅL:",
+        *(mål or ["  Inget mål angivet — utgå från aerob basbyggnad och föreslå att atleten lägger in ett mål under Träningsplan."]),
+        "SENASTE VO2MAX: 55.0 (2026-11-02)",
         "", "PULSZONER (löpning, maxpuls 188):",
         "  Zon 1: 94-112 bpm", "  Zon 2: 112-131 bpm | faktiskt tempo: 6:05/km | 40 pass",
         "  Zon 3: 131-150 bpm | faktiskt tempo: 5:20/km | 35 pass", "  Zon 4: 150-169 bpm | faktiskt tempo: 4:45/km | 12 pass",
@@ -99,6 +101,19 @@ SCENARIER = [
      "fråga": "Föreslå ett löppass för imorgon.",
      "krav": "Föreslår ett konkret pass för imorgon (2026-11-11) med distans, tempo och pulszon baserat på atletens faktiska zontempon.",
      "kräver_pass": True},
+    {"id": "mal_grund", "namn": "Grundträningsmål: 3 kondition + 2 styrka",
+     "kontext": kontext(mål=["  Grundträning: Grundträning efter fotbollssäsongen",
+                             "  Fram till: 2027-01-15 (66 dagar kvar, ≈ 9 veckor)", "  Fokus: kondition, styrka",
+                             "  Önskad fördelning per vecka: 3 konditionspass + 2 styrkepass",
+                             "  Kan träna: mån, tis, tor, lör, sön",
+                             "  Atletens anteckning: Säsongen slut, vill bygga volym i gymmet och för lungorna"]),
+     "fråga": "Gör ett schema för nästa vecka.",
+     "krav": "Schemat har exakt 3 konditionspass och 2 styrkepass, lagda ENBART på mån, tis, tor, lör och sön (inga pass ons eller fre). Styrkepassen är helkropp/basövningar. Inget tungt benpass dagen före ett kvalitetspass i löpning. Volymen är rimlig för grundträning (inte toppning/tävlingsfokus)."},
+    {"id": "mal_lopp_orealistiskt", "namn": "Orealistisk måltid för lopp",
+     "kontext": kontext(mål=["  Lopp: Stockholm halvmaraton", "  Loppdag: 2026-12-06 (26 dagar kvar, ≈ 4 veckor)",
+                             "  Distans: 21.1 km | måltid 1:20:00", "  Önskad fördelning per vecka: 4 konditionspass + 0 styrkepass"]),
+     "fråga": "Hur ska jag lägga upp de sista veckorna inför loppet?",
+     "krav": "Säger ärligt att måltiden 1:20 (≈3:47/km) är orealistisk utifrån VO2max 55 och nuvarande tempon (zon 4 ≈ 4:45/km), föreslår en mer realistisk måltid, och lägger upp de sista veckorna med nedtrappning inför loppet."},
     {"id": "direkt", "namn": "Svarar direkt, frågar inte först",
      "kontext": kontext(),
      "fråga": "Gör ett veckoschema åt mig.",

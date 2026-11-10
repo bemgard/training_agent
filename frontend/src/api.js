@@ -105,3 +105,20 @@ export async function fetchSomn(dagar) {
     const res = await fetch(`${API}/somn?dagar=${dagar ?? 0}`, { headers: getHeaders() })
     return res.json()
 }
+
+export async function fetchMal() {
+    const res = await fetch(`${API}/mal`, { headers: getHeaders() })
+    return res.json()
+}
+
+export async function sparaMal(mal, id) {
+    const res = await fetch(id ? `${API}/mal/${id}` : `${API}/mal`, {
+        method: id ? "PUT" : "POST", headers: getHeaders(), body: JSON.stringify(mal)
+    })
+    return { ok: res.ok, data: await res.json() }
+}
+
+export async function avslutaMal(id) {
+    const res = await fetch(`${API}/mal/${id}`, { method: "DELETE", headers: getHeaders() })
+    return { ok: res.ok }
+}

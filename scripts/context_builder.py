@@ -6,10 +6,12 @@ try:
     from scripts.aktivitetstyp import effektiv_typ, KATEGORIER
     from scripts.kropp import beräkna as beräkna_kropp
     from scripts.belastning import daglig_serie, maxpuls as maxpuls_belastning
+    from scripts.mal import beskriv as beskriv_mål
 except ImportError:
     from aktivitetstyp import effektiv_typ, KATEGORIER
     from kropp import beräkna as beräkna_kropp
     from belastning import daglig_serie, maxpuls as maxpuls_belastning
+    from mal import beskriv as beskriv_mål
 
 BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "training.db"
@@ -219,6 +221,15 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     alla_pass = [dict(zip(kolumner, r)) for r in c.fetchall()]
     belastning = daglig_serie(alla_pass, maxpuls_belastning(alla_pass))
 
+    aktivt_mål = None
+    if user_id:
+        mål_kolumner = ["typ", "titel", "slutdatum", "distans_km", "maltid", "sport", "fokus",
+                        "kondition_per_vecka", "styrka_per_vecka", "traningsdagar", "anteckning"]
+        c.execute(f"SELECT {', '.join(mål_kolumner)} FROM mal WHERE user_id = {ph} AND aktiv = {ph} ORDER BY skapad DESC LIMIT 1",
+                  (user_id, True))
+        rad = c.fetchone()
+        aktivt_mål = dict(zip(mål_kolumner, rad)) if rad else None
+
     kropp = []
     kroppsprofil = (None, None, None)
     if user_id:
@@ -236,6 +247,12 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     lines = []
     lines.append("=== TRÄNINGSPROFIL ===\n")
     lines.append(f"DAGENS DATUM: {datetime.now().strftime('%Y-%m-%d (%A)')}")
+
+    lines.append("\nATLETENS MÅL:")
+    if aktivt_mål:
+        lines.extend(beskriv_mål(aktivt_mål, datetime.now().date()))
+    else:
+        lines.append("  Inget mål angivet — utgå från aerob basbyggnad och föreslå att atleten lägger in ett mål under Träningsplan.")
 
     if profil:
         lines.append(f"ANVÄNDARPROFIL: {profil[0]} cm | {profil[1]} kg | VO2max: {profil[2]}")

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { fetchPasses, deletePass } from "../api"
+import MalKort from "./MalKort"
 
 const colors = {
   bg: "#0a0a0f",
@@ -90,7 +91,6 @@ function PassCard({ pass, onDelete }) {
 export default function TraningsPlan({ onChatWithGoal }) {
   const [passes, setPasses] = useState([])
   const [loading, setLoading] = useState(true)
-  const [goal, setGoal] = useState("")
 
   useEffect(() => {
     fetchPasses()
@@ -103,13 +103,6 @@ export default function TraningsPlan({ onChatWithGoal }) {
     setPasses(prev => prev.filter(p => p.id !== id))
   }
 
-  function handleGoalSubmit(e) {
-    e.preventDefault()
-    if (!goal.trim()) return
-    onChatWithGoal(`Hjälp mig bygga ett träningsprogram inför: ${goal.trim()}`)
-    setGoal("")
-  }
-
   const grouped = passes.reduce((acc, p) => {
     const month = p.datum?.slice(0, 7) ?? "Okänt"
     if (!acc[month]) acc[month] = []
@@ -119,54 +112,7 @@ export default function TraningsPlan({ onChatWithGoal }) {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <div style={{
-        background: colors.cardGreen,
-        border: `1px solid ${colors.borderGreen}`,
-        borderRadius: 12,
-        padding: "20px 24px",
-        marginBottom: 32,
-      }}>
-        <div style={{ fontSize: 13, color: colors.accent, fontWeight: 600, marginBottom: 4 }}>
-          Skapa ny träningsplan
-        </div>
-        <div style={{ fontSize: 12, color: colors.muted, marginBottom: 14 }}>
-          Berätta vad du tränar inför så bygger coachen ett program åt dig.
-        </div>
-        <form onSubmit={handleGoalSubmit} style={{ display: "flex", gap: 10 }}>
-          <input
-            value={goal}
-            onChange={e => setGoal(e.target.value)}
-            placeholder="t.ex. halvmaraton om 3 månader, 5K under 25 min..."
-            style={{
-              flex: 1,
-              background: "#0f2a1e",
-              border: `1px solid ${colors.borderGreen}`,
-              borderRadius: 8,
-              padding: "10px 14px",
-              color: colors.text,
-              fontSize: 13,
-              outline: "none",
-            }}
-          />
-          <button
-            type="submit"
-            disabled={!goal.trim()}
-            style={{
-              background: goal.trim() ? colors.cardGreen : "transparent",
-              border: `1px solid ${goal.trim() ? colors.accent + "80" : colors.border}`,
-              color: goal.trim() ? colors.accent : colors.muted,
-              borderRadius: 8,
-              padding: "10px 18px",
-              cursor: goal.trim() ? "pointer" : "not-allowed",
-              fontSize: 13,
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Fråga coachen →
-          </button>
-        </form>
-      </div>
+      <MalKort onChatWithGoal={onChatWithGoal} />
 
       {loading ? (
         <div style={{ color: colors.muted, textAlign: "center", marginTop: 40 }}>
@@ -177,7 +123,7 @@ export default function TraningsPlan({ onChatWithGoal }) {
           <div style={{ fontSize: 28, marginBottom: 12 }}>📅</div>
           <div style={{ fontSize: 14 }}>Inga sparade pass ännu.</div>
           <div style={{ fontSize: 12, marginTop: 6 }}>
-            Spara pass från AI-coachen eller skapa en plan ovan.
+            Spara pass från AI-coachen eller be den om en plan utifrån ditt mål ovan.
           </div>
         </div>
       ) : (

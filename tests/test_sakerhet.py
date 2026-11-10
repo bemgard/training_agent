@@ -138,6 +138,25 @@ def test_ser_inte_annans_data(anv):
     assert klient.get("/api/trender?dagar=0", headers=rubrik(anv["tb"])).json()["volym"] == []
 
 
+def test_mal_ar_privata(anv):
+    mål = {"typ": "grundtraning", "titel": "Annas hemliga mål", "fokus": ["kondition"], "traningsdagar": ["man"]}
+    assert klient.post("/api/mal", json=mål, headers=rubrik(anv["ta"])).status_code == 200
+    a_mål = klient.get("/api/mal", headers=rubrik(anv["ta"])).json()["aktivt"]
+    assert a_mål["titel"] == "Annas hemliga mål"
+    # B ser inte A:s mål och kan varken ändra eller avsluta det
+    assert klient.get("/api/mal", headers=rubrik(anv["tb"])).json()["aktivt"] is None
+    assert klient.put(f"/api/mal/{a_mål['id']}", json={**mål, "titel": "Kapat"}, headers=rubrik(anv["tb"])).status_code == 404
+    assert klient.delete(f"/api/mal/{a_mål['id']}", headers=rubrik(anv["tb"])).status_code == 404
+    assert klient.get("/api/mal", headers=rubrik(anv["ta"])).json()["aktivt"]["titel"] == "Annas hemliga mål"
+
+
+def test_mal_validering(anv):
+    fel = [{"typ": "hackning", "titel": "x"}, {"typ": "lopp", "titel": ""}, {"typ": "lopp", "titel": "x", "slutdatum": "inte-ett-datum"},
+           {"typ": "lopp", "titel": "x", "traningsdagar": ["måndag'; DROP TABLE mal; --"]}]
+    for data in fel:
+        assert klient.post("/api/mal", json=data, headers=rubrik(anv["tb"])).status_code == 422, data
+
+
 # ── 4. SQL-injektion ──────────────────────────────────────────────────────────
 @pytest.mark.parametrize("email", ["' OR '1'='1", "anna@test.se' --", "x'; DROP TABLE users; --"])
 def test_sql_injektion_i_inloggning(anv, email):
