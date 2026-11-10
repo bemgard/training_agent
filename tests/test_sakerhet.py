@@ -157,6 +157,45 @@ def test_mal_validering(anv):
         assert klient.post("/api/mal", json=data, headers=rubrik(anv["tb"])).status_code == 422, data
 
 
+def test_om_mig_och_regler_ar_privata(anv):
+    profil = {"erfarenhet": "motionar", "skador": "Annas knäskada", "utrustning": ["gym"]}
+    assert klient.put("/api/om-mig", json=profil, headers=rubrik(anv["ta"])).status_code == 200
+    assert klient.put("/api/om-mig", json={**profil, "preferenser": "morgon"}, headers=rubrik(anv["ta"])).status_code == 200  # upsert
+    a = klient.get("/api/om-mig", headers=rubrik(anv["ta"])).json()
+    assert a["profil"]["skador"] == "Annas knäskada" and a["profil"]["preferenser"] == "morgon"
+    regel = {"plats": "Täby", "fran_kategori": "running", "max_km": 10, "till_kategori": "football"}
+    assert klient.post("/api/aktivitetsregler", json=regel, headers=rubrik(anv["ta"])).status_code == 200
+    regel_id = klient.get("/api/om-mig", headers=rubrik(anv["ta"])).json()["regler"][0]["id"]
+    # B ser varken A:s profil eller regler och kan inte ta bort A:s regel
+    b = klient.get("/api/om-mig", headers=rubrik(anv["tb"])).json()
+    assert b["profil"]["skador"] is None and b["regler"] == []
+    assert klient.delete(f"/api/aktivitetsregler/{regel_id}", headers=rubrik(anv["tb"])).status_code == 404
+    assert len(klient.get("/api/om-mig", headers=rubrik(anv["ta"])).json()["regler"]) == 1
+
+
+def test_om_mig_validering(anv):
+    fel_profil = [{"erfarenhet": "gud"}, {"utrustning": ["raketgevär"]}, {"fritext": "x" * 2001}]
+    for data in fel_profil:
+        assert klient.put("/api/om-mig", json=data, headers=rubrik(anv["tb"])).status_code == 422, data
+    fel_regel = [{"plats": "", "fran_kategori": "running", "till_kategori": "football"},
+                 {"plats": "   ", "fran_kategori": "running", "till_kategori": "football"},
+                 {"plats": "X", "fran_kategori": "running'; DROP TABLE users; --", "till_kategori": "football"},
+                 {"plats": "X", "fran_kategori": "running", "till_kategori": "running"},
+                 {"plats": "X", "fran_kategori": "running", "max_km": -1, "till_kategori": "football"}]
+    for data in fel_regel:
+        assert klient.post("/api/aktivitetsregler", json=data, headers=rubrik(anv["tb"])).status_code == 422, data
+
+
+def test_klassningsregler():
+    from scripts.aktivitetstyp import effektiv_typ
+    regler = [{"plats": "Täby", "fran_kategori": "running", "max_km": 10, "till_kategori": "football"}]
+    assert effektiv_typ("running", "Täby", 6, regler=regler) == ("football", False)
+    assert effektiv_typ("running", "Täby", 12, regler=regler) == ("running", False)       # långpass räknas som löpning
+    assert effektiv_typ("running", "Solna", 6, regler=regler) == ("running", False)
+    assert effektiv_typ("running", "Täby", 6) == ("running", False)                       # ingen hårdkodning kvar
+    assert effektiv_typ("running", "Täby", 6, typ_manuell="running", regler=regler) == ("running", False)  # manuellt val vinner
+
+
 # ── 4. SQL-injektion ──────────────────────────────────────────────────────────
 @pytest.mark.parametrize("email", ["' OR '1'='1", "anna@test.se' --", "x'; DROP TABLE users; --"])
 def test_sql_injektion_i_inloggning(anv, email):

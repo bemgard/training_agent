@@ -3,12 +3,14 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 try:
-    from scripts.aktivitetstyp import effektiv_typ, KATEGORIER
+    from scripts.aktivitetstyp import effektiv_typ, hämta_regler, KATEGORIER
+    from scripts.atletprofil import beskriv as beskriv_atlet
     from scripts.kropp import beräkna as beräkna_kropp
     from scripts.belastning import daglig_serie, maxpuls as maxpuls_belastning
     from scripts.mal import beskriv as beskriv_mål
 except ImportError:
-    from aktivitetstyp import effektiv_typ, KATEGORIER
+    from aktivitetstyp import effektiv_typ, hämta_regler, KATEGORIER
+    from atletprofil import beskriv as beskriv_atlet
     from kropp import beräkna as beräkna_kropp
     from belastning import daglig_serie, maxpuls as maxpuls_belastning
     from mal import beskriv as beskriv_mål
@@ -45,20 +47,6 @@ def load_pulszoner(user_id: int = None) -> dict:
         "max":  max_puls
     }
 
-
-def classify_activity(typ: str, plats: str, distans_km: float) -> str:
-    plats = (plats or "").lower()
-    if "täby" in plats and typ in ("running", "treadmill_running") and distans_km < 10:
-        return "football"
-    if typ in ("running", "treadmill_running"):
-        return "running"
-    if typ == "hiit":
-        return "hiit"
-    if typ == "indoor_cardio":
-        return "cardio"
-    if typ == "cross_country_skiing_ws":
-        return "skiing"
-    return typ
 
 def kmh_till_tempo(kmh):
     if not kmh or kmh == 0:
@@ -119,15 +107,19 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     """, uid_val)
     pr = c.fetchall()
 
+    regler = hämta_regler(c, user_id, ph)
+
+    # Alla löpregistrerade pass (hela historiken) — filtreras via effektiv_typ så att
+    # användarens egna regler (t.ex. fotbollsplan loggad som löpning) och manuella val gäller
     c.execute(f"""
-        SELECT datum, typ, distans_km, duration_min, snitt_puls, snitt_tempo, plats
+        SELECT datum, typ, distans_km, duration_min, snitt_puls, snitt_tempo, plats, typ_manuell
         FROM activities
-        WHERE datum >= {ph} {uid_filter}
-        AND typ IN ('running', 'treadmill_running')
-        AND NOT (LOWER(plats) = 'täby' AND distans_km < 10)
+        WHERE typ IN ('running', 'treadmill_running', 'trail_running') {uid_filter}
         ORDER BY datum DESC
-    """, (sedan,) + uid_val)
-    löppass = c.fetchall()
+    """, uid_val)
+    alla_löp = [r for r in c.fetchall()
+                if effektiv_typ(r[1], r[6], r[2], r[3], r[4], r[7], regler)[0] == "running"]
+    löppass = [r for r in alla_löp if r[0] >= sedan]
 
     c.execute(f"""
         SELECT datum, typ, distans_km, duration_min, snitt_puls, plats, typ_manuell, namn
@@ -142,7 +134,7 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     övriga_pass = []
     for rad in alla:
         datum, typ, distans_km, duration_min, snitt_puls, plats, typ_manuell, namn = rad
-        kategori, gissad = effektiv_typ(typ, plats, distans_km, duration_min, snitt_puls, typ_manuell)
+        kategori, gissad = effektiv_typ(typ, plats, distans_km, duration_min, snitt_puls, typ_manuell, regler)
         label = KATEGORIER.get(kategori, "Oklassat pass") if kategori else "Oklassat pass"
         vecka = datetime.strptime(datum, "%Y-%m-%d").strftime("%Y-W%W")
         v = veckor_data[vecka]
@@ -156,17 +148,14 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
             övriga_pass.append((datum, label + (" (gissning)" if gissad else ""), duration_min, snitt_puls, distans_km))
 
     def zon_stats(low, high):
-        c.execute(f"""
-            SELECT ROUND(AVG(snitt_puls)::numeric, 0), ROUND(AVG(distans_km/(duration_min/60.0))::numeric, 2), COUNT(*)
-            FROM activities
-            WHERE typ IN ('running','treadmill_running')
-            AND snitt_puls BETWEEN {ph} AND {ph}
-            AND distans_km > 2
-            AND NOT (LOWER(plats) = 'täby' AND distans_km < 10)
-            {uid_filter}
-        """, (low, high) + uid_val)
-        return c.fetchone()
-    
+        urval = [r for r in alla_löp
+                 if r[4] is not None and low <= r[4] <= high and (r[2] or 0) > 2 and (r[3] or 0) > 0]
+        if not urval:
+            return (None, None, 0)
+        snittpuls = round(sum(r[4] for r in urval) / len(urval))
+        kmh = round(sum(r[2] / (r[3] / 60.0) for r in urval) / len(urval), 2)
+        return (snittpuls, kmh, len(urval))
+
     zon2 = zon_stats(*pulszoner["zon2"])
     zon3 = zon_stats(*pulszoner["zon3"])
     zon4 = zon_stats(*pulszoner["zon4"])
@@ -230,6 +219,13 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
         rad = c.fetchone()
         aktivt_mål = dict(zip(mål_kolumner, rad)) if rad else None
 
+    atlet = None
+    if user_id:
+        atlet_kolumner = ["erfarenhet", "sporter", "utrustning", "skador", "preferenser", "fritext"]
+        c.execute(f"SELECT {', '.join(atlet_kolumner)} FROM atletprofil WHERE user_id = {ph}", (user_id,))
+        rad = c.fetchone()
+        atlet = dict(zip(atlet_kolumner, rad)) if rad else None
+
     kropp = []
     kroppsprofil = (None, None, None)
     if user_id:
@@ -247,6 +243,9 @@ def get_context(veckor: int = 12, user_id: int = None) -> str:
     lines = []
     lines.append("=== TRÄNINGSPROFIL ===\n")
     lines.append(f"DAGENS DATUM: {datetime.now().strftime('%Y-%m-%d (%A)')}")
+
+    lines.append("\nOM ATLETEN (atletens egna uppgifter — respektera skador, utrustning och preferenser):")
+    lines.extend(beskriv_atlet(atlet, regler, KATEGORIER))
 
     lines.append("\nATLETENS MÅL:")
     if aktivt_mål:

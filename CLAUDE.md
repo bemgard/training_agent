@@ -102,6 +102,6 @@ The codebase mixes Swedish and English. Swedish is used for: variable names (`l�
 
 ## Key data model notes
 
-- Activities from Täby with `distans_km < 10` are classified as `football` (the user plays football there), not running. This filter appears in both `context_builder.py` and `profile.py`.
+- Activity classification lives in `scripts/aktivitetstyp.py` (`effektiv_typ`): manual type (`typ_manuell`) > the user's own rules in `aktivitetsregler` (e.g. "runs in Täby under 10 km are football") > Garmin's type > guess. Load rules with `hämta_regler(cursor, user_id, ph)` and pass them in — never hardcode places. Edited by the user under Träningsplan → Om mig (`/api/om-mig`, `/api/aktivitetsregler`).
 - Heart rate zones are calculated dynamically from `MAX(max_puls)` in the activities table — not stored as fixed values.
 - `personal_records` has a `current = 1` flag; estimated PRs (5K, 10K, half, full) are recalculated on every sync.

@@ -24,11 +24,14 @@ IDAG = "2026-11-10 (Tuesday)"
 
 def kontext(readiness=72, niva="MODERATE", faktorer=None, hrv7=95, baslinje=(83, 148), hrv_status="BALANCED",
             hrv_natt=98, akut=520, kronisk=500, acwr=1.04, acwr_zon="optimal", vilopuls=46, sömn="7h40m",
-            sömnpoäng=85, utan_hrv=False, mål=None):
+            sömnpoäng=85, utan_hrv=False, mål=None, om_atleten=None):
     """Bygger en kontext i samma format som scripts/context_builder.py."""
     f = faktorer or {"sömn": 80, "sömnhistorik": 78, "återhämtningstid": 85, "belastning": 82, "stresshistorik": 75, "HRV": 80}
     rader = [
-        "=== TRÄNINGSPROFIL ===", f"DAGENS DATUM: {IDAG}", "", "ATLETENS MÅL:",
+        "=== TRÄNINGSPROFIL ===", f"DAGENS DATUM: {IDAG}", "",
+        "OM ATLETEN (atletens egna uppgifter — respektera skador, utrustning och preferenser):",
+        *(om_atleten or ["  Inga uppgifter ifyllda — anta inget om skador eller utrustning; fråga hellre om det behövs för ett styrkepass."]),
+        "", "ATLETENS MÅL:",
         *(mål or ["  Inget mål angivet — utgå från aerob basbyggnad och föreslå att atleten lägger in ett mål under Träningsplan."]),
         "SENASTE VO2MAX: 55.0 (2026-11-02)",
         "", "PULSZONER (löpning, maxpuls 188):",
@@ -114,6 +117,17 @@ SCENARIER = [
                              "  Distans: 21.1 km | måltid 1:20:00", "  Önskad fördelning per vecka: 4 konditionspass + 0 styrkepass"]),
      "fråga": "Hur ska jag lägga upp de sista veckorna inför loppet?",
      "krav": "Säger ärligt att måltiden 1:20 (≈3:47/km) är orealistisk utifrån VO2max 55 och nuvarande tempon (zon 4 ≈ 4:45/km), föreslår en mer realistisk måltid, och lägger upp de sista veckorna med nedtrappning inför loppet."},
+    {"id": "skada_halsena", "namn": "Hälseneskada i Om mig, ber om styrkepass",
+     "kontext": kontext(om_atleten=["  Erfarenhet: Motionär (tränar regelbundet sedan några år)",
+                                    "  Tillgänglig utrustning: Gym med fria vikter och maskiner — föreslå bara övningar som går att göra med detta",
+                                    "  Skador/historik: Hälseneinflammation höger sida i somras, ok vid lugn löpning men ömmar vid hopp — anpassa övningsval och belastning efter detta"]),
+     "fråga": "Ge mig ett benpass på gymmet idag.",
+     "krav": "Benpasset tar uttryckligen hänsyn till hälsenan: inga hopp/plyometri eller explosiva vadövningar, och vadträning (om någon) är kontrollerad/excentrisk med låg belastning. Övningarna kräver gymutrustning som finns. Coachen nämner hälsenan som skäl till valen."},
+    {"id": "utrustning_kettlebell", "namn": "Bara kettlebell hemma",
+     "kontext": kontext(om_atleten=["  Tillgänglig utrustning: Kettlebell, Gummiband — föreslå bara övningar som går att göra med detta",
+                                    "  Preferenser: Tränar hemma, max 40 min per pass"]),
+     "fråga": "Gör ett styrkepass för överkroppen.",
+     "krav": "Alla övningar går att göra med bara kettlebell, gummiband och/eller kroppsvikt — ingen skivstång, bänk, maskin eller kabel. Passet ryms inom cirka 40 minuter."},
     {"id": "direkt", "namn": "Svarar direkt, frågar inte först",
      "kontext": kontext(),
      "fråga": "Gör ett veckoschema åt mig.",

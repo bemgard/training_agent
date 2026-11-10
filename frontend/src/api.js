@@ -122,3 +122,23 @@ export async function avslutaMal(id) {
     const res = await fetch(`${API}/mal/${id}`, { method: "DELETE", headers: getHeaders() })
     return { ok: res.ok }
 }
+
+export async function fetchOmMig() {
+    const res = await fetch(`${API}/om-mig`, { headers: getHeaders() })
+    return res.json()
+}
+
+export async function sparaOmMig(profil) {
+    const res = await fetch(`${API}/om-mig`, { method: "PUT", headers: getHeaders(), body: JSON.stringify(profil) })
+    return { ok: res.ok }
+}
+
+export async function läggTillRegel(regel) {
+    const res = await fetch(`${API}/aktivitetsregler`, { method: "POST", headers: getHeaders(), body: JSON.stringify(regel) })
+    return { ok: res.ok, data: await res.json() }
+}
+
+export async function taBortRegel(id) {
+    const res = await fetch(`${API}/aktivitetsregler/${id}`, { method: "DELETE", headers: getHeaders() })
+    return { ok: res.ok }
+}

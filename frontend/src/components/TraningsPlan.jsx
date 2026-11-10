@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { fetchPasses, deletePass } from "../api"
 import MalKort from "./MalKort"
+import OmMigKort from "./OmMigKort"
 
 const colors = {
   bg: "#0a0a0f",
@@ -113,6 +114,7 @@ export default function TraningsPlan({ onChatWithGoal }) {
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
       <MalKort onChatWithGoal={onChatWithGoal} />
+      <OmMigKort />
 
       {loading ? (
         <div style={{ color: colors.muted, textAlign: "center", marginTop: 40 }}>

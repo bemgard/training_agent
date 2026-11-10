@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 from api.database import get_db, USE_SQLITE
 from api.routes.auth import verifiera_token
-from scripts.aktivitetstyp import effektiv_typ
+from scripts.aktivitetstyp import effektiv_typ, hämta_regler
 from scripts.vo2_estimat import uppskatta
 from scripts.belastning import daglig_serie, maxpuls
 
@@ -68,8 +68,9 @@ def get_trender(dagar: Optional[int] = 365, db=Depends(get_db), user=Depends(get
                zon1_sek, zon2_sek, zon3_sek, zon4_sek, zon5_sek
         FROM activities WHERE user_id = {ph} ORDER BY datum
     """, (uid,))
+    regler = hämta_regler(db.cursor(), uid, ph)
     for a in aktiviteter:
-        a["kategori"], _ = effektiv_typ(a["typ"], a["plats"], a["distans_km"], a["duration_min"], a["snitt_puls"], a["typ_manuell"])
+        a["kategori"], _ = effektiv_typ(a["typ"], a["plats"], a["distans_km"], a["duration_min"], a["snitt_puls"], a["typ_manuell"], regler)
     löppass = [a for a in aktiviteter if a["kategori"] == "running"]
     vo2_egen = i_period(uppskatta(löppass, vilopuls_per_dag))
 

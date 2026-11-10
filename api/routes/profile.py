@@ -5,18 +5,18 @@ from api.database import get_db, USE_SQLITE
 from api.routes.auth import verifiera_token
 from pydantic import BaseModel
 from typing import Optional
-from scripts.aktivitetstyp import effektiv_typ, KATEGORIER
+from scripts.aktivitetstyp import effektiv_typ, hämta_regler, KATEGORIER
 from scripts.belastning import daglig_serie, maxpuls
 
 router = APIRouter()
 ph = "?" if USE_SQLITE else "%s"
 
-def med_kategori(rad):
+def med_kategori(rad, regler=()):
     """Lägger till kategori/gissad (gemensam logik med coachen, se scripts/aktivitetstyp.py)."""
     d = dict(rad)
     d["kategori"], d["gissad"] = effektiv_typ(
         d.get("typ"), d.get("plats"), d.get("distans_km"),
-        d.get("duration_min"), d.get("snitt_puls"), d.get("typ_manuell"))
+        d.get("duration_min"), d.get("snitt_puls"), d.get("typ_manuell"), regler)
     return d
 
 def get_current_user(authorization: str = Header(None)):
@@ -29,6 +29,7 @@ def get_current_user(authorization: str = Header(None)):
 def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
     c = db.cursor()
     user_id = user["user_id"]
+    regler = hämta_regler(c, user_id, ph)
 
     c.execute(f"""
         SELECT activity_id, datum, namn, typ, typ_manuell, distans_km, duration_min,
@@ -38,7 +39,7 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
         ORDER BY datum DESC, activity_id DESC
         LIMIT 10
     """, (user_id,))
-    result = [med_kategori(a) for a in c.fetchall()]
+    result = [med_kategori(a, regler) for a in c.fetchall()]
 
     måndag = (datetime.now() - timedelta(days=datetime.now().weekday())).strftime("%Y-%m-%d")
     c.execute(f"""
@@ -47,7 +48,7 @@ def get_profile(db=Depends(get_db), user=Depends(get_current_user)):
         WHERE datum >= {ph} AND user_id = {ph}
         ORDER BY datum ASC
     """, (måndag, user_id))
-    veckans = [med_kategori(a) for a in c.fetchall()]
+    veckans = [med_kategori(a, regler) for a in c.fetchall()]
 
     c.execute(f"SELECT langd_cm, vikt_kg, vo2max FROM user_profile WHERE id = {ph} LIMIT 1", (user_id,))
     profil = c.fetchone()
