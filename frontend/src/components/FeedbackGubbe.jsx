@@ -63,7 +63,7 @@ export default function FeedbackGubbe({ flik, nyheter = [], onNyheterSedda }) {
 
   const harNyheter = nyheter.length > 0
   return (
-    <div className="feedback-gubbe">
+    <div className={`feedback-gubbe${öppen ? " oppen" : ""}`}>
       {/* Pratbubblan — växer ut från gubben */}
       <div className={`gubbe-bubbla${öppen ? " oppen" : ""}`} role="dialog" aria-label="Tyck till om appen" aria-hidden={!öppen}>
         <button className="gubbe-stang" onClick={stäng} title="Stäng"><X size={16} /></button>
