@@ -3,6 +3,7 @@ import { Sparkles, RefreshCw, CheckCircle2, Shuffle, Moon, CalendarCheck } from 
 import { fetchInsikt, uppdateraInsikt, sparaPlan } from "../api"
 import { lokaltDatum } from "../aktivitetstyper"
 import PlanPass from "./PlanPass"
+import Tummar from "./Tummar"
 
 const C = { surface: "#161b25", border: "#232a38", text: "#f1f5f9", sub: "#94a3b8", muted: "#64748b" }
 const REK = {
@@ -27,6 +28,7 @@ function Veckosammanfattning({ v }) {
         </div>
       )}
       {v.fokus && <div style={{ fontSize: 13, color: C.text, marginTop: 10 }}><b>Nästa vecka:</b> <span style={{ color: C.sub }}>{v.fokus}</span></div>}
+      <Tummar kalla="insikt" refId={`${v.datum}:vecka`} utdrag={`${v.rubrik} — ${v.text}`} />
     </div>
   )
 }
@@ -89,6 +91,7 @@ export default function InsiktKort({ dagsformÄndrad }) {
               </div>
             )}
             {fel && <div style={{ color: "#f87171", fontSize: 12, marginTop: 8 }}>{fel}</div>}
+            <Tummar key={`${m.datum}:${m.antal}`} kalla="insikt" refId={`${m.datum}:morgon:${m.antal}`} utdrag={`${m.rubrik} — ${m.text}`} />
           </div>
         )
       })()}

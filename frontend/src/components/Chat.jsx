@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown"
 import { streamChat, skapaSamtal, fetchSamtalLista, fetchSamtal, taBortSamtal, sparaPlan } from "../api"
 import { lokaltDatum } from "../aktivitetstyper"
 import PlanPass from "./PlanPass"
+import Tummar from "./Tummar"
 
 
 const RUNNER_CSS = `
@@ -89,7 +90,7 @@ function PlanFörhandsvisning({ plan, samtalId }) {
   )
 }
 
-function ChatMessage({ role, content, samtalId, strömmar }) {
+function ChatMessage({ role, content, samtalId, strömmar, index }) {
   const plan = role === "assistant" && !strömmar ? extractPlan(content) : null
   // Dölj blocket (även ett halvfärdigt under strömning) och det gamla [PASS]-formatet i äldre samtal
   const visningsText = content.replace(/\[PLAN\][\s\S]*?(\[\/PLAN\]|$)/, "").replace(/\[PASS\][\s\S]*?\[\/PASS\]/, "").trim()
@@ -113,6 +114,7 @@ function ChatMessage({ role, content, samtalId, strömmar }) {
       }}>
         <ReactMarkdown>{visningsText}</ReactMarkdown>
         {plan && <PlanFörhandsvisning plan={plan} samtalId={samtalId} />}
+        {role === "assistant" && !strömmar && samtalId && visningsText && <Tummar kalla="chatt" refId={`${samtalId}:${index}`} utdrag={visningsText} />}
       </div>
     </div>
   )
@@ -264,7 +266,7 @@ export default function Chat({ initialInput = "", onInitialInputConsumed }) {
         {messages.map((m, i) => {
           if (streaming && i === messages.length - 1 && m.role === "assistant" && m.content === "")
             return <RunnerLoading key={i} />
-          return <ChatMessage key={i} {...m} samtalId={samtalId} strömmar={streaming && i === messages.length - 1} />
+          return <ChatMessage key={i} {...m} index={i} samtalId={samtalId} strömmar={streaming && i === messages.length - 1} />
         })}
         <div ref={chatEndRef} />
       </div>

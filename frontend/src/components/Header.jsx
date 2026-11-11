@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { LayoutDashboard, TrendingUp, MessageCircle, CalendarDays, Salad } from "lucide-react"
+import { LayoutDashboard, TrendingUp, MessageCircle, CalendarDays, Salad, Inbox } from "lucide-react"
 import { syncGarmin } from "../api"
 
 const colors = {
@@ -10,7 +10,7 @@ const colors = {
   text: "#e2e8f0",
 }
 
-export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
+export default function Header({ activeTab, setActiveTab, profile, onLogout, admin, nyaIInkorgen }) {
   const [synkar, setSynkar] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null)
 
@@ -34,6 +34,7 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
     { id: "chat", label: "AI-Coach", kort: "Coach", ikon: MessageCircle },
     { id: "plan", label: "Träningsplan", kort: "Plan", ikon: CalendarDays },
     { id: "kost", label: "Kost", kort: "Kost", ikon: Salad, snart: true },
+    ...(admin ? [{ id: "inkorg", label: "Inkorg", kort: "Inkorg", ikon: Inbox, antal: nyaIInkorgen }] : []),
   ]
 
   async function triggerSync() {
@@ -127,6 +128,9 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
               fontWeight: 500,
             }}>
               {tab.label}
+              {tab.antal > 0 && (
+                <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#0a0a0f", background: "#6ee7b7", borderRadius: 999, padding: "1px 6px" }}>{tab.antal}</span>
+              )}
               {tab.snart && (
                 <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
                   color: "#fbbf24", background: "#fbbf241a", border: "1px solid #fbbf2440", borderRadius: 999, padding: "1px 6px" }}>
@@ -143,7 +147,7 @@ export default function Header({ activeTab, setActiveTab, profile, onLogout }) {
       {tabs.map(tab => (
         <button key={tab.id} className={activeTab === tab.id ? "aktiv" : ""} onClick={() => { setActiveTab(tab.id); window.scrollTo(0, 0) }}>
           <tab.ikon size={20} />
-          <span>{tab.kort}{tab.snart && <span style={{ color: "#fbbf24" }}> ·</span>}</span>
+          <span>{tab.kort}{tab.snart && <span style={{ color: "#fbbf24" }}> ·</span>}{tab.antal > 0 && <span style={{ color: "#6ee7b7" }}> {tab.antal}</span>}</span>
         </button>
       ))}
     </nav>

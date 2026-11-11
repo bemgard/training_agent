@@ -552,6 +552,51 @@ def test_aktivitetslistan(anv):
     assert klient.get("/api/aktiviteter?limit=500", headers=rubrik(anv["ta"])).status_code == 422
 
 
+def test_feedback_och_admin(anv):
+    a, b = rubrik(anv["ta"]), rubrik(anv["tb"])
+    db = sqlite3.connect(DB_FIL)
+    db.execute("UPDATE users SET admin = 1 WHERE id = ?", (anv["a_id"],))   # A är admin, B vanlig användare
+    db.commit(); db.close()
+
+    r = klient.post("/api/feedback", json={"typ": "ide", "text": "Bertils idé", "kontext": {"flik": "plan", "hack": "x" * 5000}}, headers=b)
+    assert r.status_code == 200
+    assert klient.get("/api/feedback/status", headers=b).json() == {"admin": False, "nyheter": [], "nya_i_inkorgen": None}
+
+    # Bara admin ser inkorgen och kan ändra status
+    assert klient.get("/api/admin/feedback", headers=b).status_code == 403
+    assert klient.patch("/api/admin/feedback/1", json={"status": "klar"}, headers=b).status_code == 403
+    inkorg = klient.get("/api/admin/feedback", headers=a).json()
+    post = next(f for f in inkorg["feedback"] if f["text"] == "Bertils idé")
+    assert post["kontext"] == {"flik": "plan"} and post["status"] == "ny"   # okända kontextfält filtreras bort
+    assert klient.get("/api/feedback/status", headers=a).json()["nya_i_inkorgen"] >= 1
+
+    # När admin markerar klar med svar får användaren se det en gång
+    assert klient.patch(f"/api/admin/feedback/{post['id']}", json={"status": "klar", "svar": "Nu finns det!"}, headers=a).status_code == 200
+    nyheter = klient.get("/api/feedback/status", headers=b).json()["nyheter"]
+    assert len(nyheter) == 1 and nyheter[0]["svar"] == "Nu finns det!"
+    assert klient.post(f"/api/feedback/{post['id']}/sett", headers=a).status_code == 404   # inte A:s feedback
+    assert klient.post(f"/api/feedback/{post['id']}/sett", headers=b).status_code == 200
+    assert klient.get("/api/feedback/status", headers=b).json()["nyheter"] == []
+
+    # Validering
+    for fel in [{"typ": "hack", "text": "x"}, {"typ": "ide", "text": "   "}, {"typ": "ide", "text": "x" * 2001}]:
+        assert klient.post("/api/feedback", json=fel, headers=b).status_code == 422, fel
+
+
+def test_coach_betyg(anv):
+    a, b = rubrik(anv["ta"]), rubrik(anv["tb"])
+    assert klient.post("/api/betyg", json={"kalla": "insikt", "ref": "2026-11-11:morgon", "betyg": 1}, headers=b).status_code == 200
+    # Ändra sig: samma ref ersätts i stället för att dubbleras
+    assert klient.post("/api/betyg", json={"kalla": "insikt", "ref": "2026-11-11:morgon", "betyg": -1, "orsak": "för långt",
+                                           "utdrag": "Byt löpningen…"}, headers=b).status_code == 200
+    db = sqlite3.connect(DB_FIL)
+    assert db.execute("SELECT COUNT(*) FROM coach_betyg WHERE ref = '2026-11-11:morgon'").fetchone()[0] == 1
+    db.close()
+    inkorg = klient.get("/api/admin/feedback", headers=a).json()
+    assert inkorg["betyg"]["insikt"]["ner"] >= 1 and inkorg["tummar_ner"][0]["orsak"] == "för långt"
+    assert klient.post("/api/betyg", json={"kalla": "insikt", "ref": "x", "betyg": 5}, headers=b).status_code == 422
+
+
 def test_bygg_historik():
     from api.routes.chat import bygg_historik
     assert bygg_historik([("assistant", "a"), ("user", "f1"), ("user", "f2"), ("assistant", "s")]) == [

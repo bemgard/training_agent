@@ -230,3 +230,32 @@ export async function fetchAktiviteter(offset = 0, limit = 10) {
     const res = await fetch(`${API}/aktiviteter?offset=${offset}&limit=${limit}`, { headers: getHeaders() })
     return res.ok ? res.json() : { aktiviteter: [], fler: false }
 }
+
+export async function skickaFeedback(typ, text, kontext) {
+    const res = await fetch(`${API}/feedback`, { method: "POST", headers: getHeaders(), body: JSON.stringify({ typ, text, kontext }) })
+    return { ok: res.ok, data: await res.json() }
+}
+
+export async function fetchFeedbackStatus() {
+    const res = await fetch(`${API}/feedback/status`, { headers: getHeaders() })
+    return res.ok ? res.json() : null
+}
+
+export async function markeraFeedbackSett(id) {
+    await fetch(`${API}/feedback/${id}/sett`, { method: "POST", headers: getHeaders() })
+}
+
+export async function sättBetyg(kalla, ref, betyg, orsak, utdrag) {
+    const res = await fetch(`${API}/betyg`, { method: "POST", headers: getHeaders(), body: JSON.stringify({ kalla, ref, betyg, orsak, utdrag }) })
+    return { ok: res.ok }
+}
+
+export async function fetchInkorg(status) {
+    const res = await fetch(`${API}/admin/feedback${status ? `?status=${status}` : ""}`, { headers: getHeaders() })
+    return res.ok ? res.json() : null
+}
+
+export async function ändraFeedback(id, status, svar) {
+    const res = await fetch(`${API}/admin/feedback/${id}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ status, svar }) })
+    return { ok: res.ok }
+}

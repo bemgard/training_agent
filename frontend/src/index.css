@@ -56,3 +56,54 @@ body { background: #0a0a0f; }
   display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; cursor: pointer;
 }
 .bottennav button.aktiv { color: #6ee7b7; }
+
+/* ── Feedback-gubben ─────────────────────────────────────────────────────── */
+.feedback-gubbe { position: fixed; left: 18px; bottom: 14px; z-index: 45; }
+.gubbe-knapp { background: none; border: none; padding: 4px; cursor: pointer; display: block; transform-origin: 50% 100%;
+  transition: transform .25s ease; animation: gubbe-vaj 6s ease-in-out infinite; }
+.gubbe-knapp img { height: 64px; display: block; opacity: .88; transition: opacity .2s; }
+.gubbe-knapp:hover img { opacity: 1; }
+.gubbe-knapp:hover { transform: scale(1.06) rotate(-3deg); }
+.gubbe-knapp.nyhet img { filter: drop-shadow(0 0 6px #6ee7b7aa); }
+@keyframes gubbe-vaj { 0%, 88%, 100% { transform: rotate(0) } 92% { transform: rotate(-6deg) } 96% { transform: rotate(4deg) } }
+
+.gubbe-hej { position: absolute; left: 52px; bottom: 58px; background: #f1f5f9; color: #0a0a0f; border: none; cursor: pointer;
+  border-radius: 14px 14px 14px 4px; padding: 6px 12px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  box-shadow: 0 6px 20px #0008; animation: gubbe-pop .35s cubic-bezier(.2,1.4,.4,1); }
+
+.gubbe-bubbla { position: absolute; left: 44px; bottom: 62px; width: min(340px, calc(100vw - 70px));
+  background: #161b25; border: 1px solid #2a3446; border-radius: 18px 18px 18px 4px; padding: 18px 18px 16px;
+  box-shadow: 0 18px 50px #000a; color: #e2e8f0;
+  transform-origin: 0% 100%; transform: scale(.2); opacity: 0; pointer-events: none;
+  transition: transform .28s cubic-bezier(.2,1.25,.4,1), opacity .2s ease; }
+.gubbe-bubbla.oppen { transform: scale(1); opacity: 1; pointer-events: auto; }
+.gubbe-bubbla::after { content: ""; position: absolute; left: -9px; bottom: 10px; width: 16px; height: 16px; background: #161b25;
+  border-left: 1px solid #2a3446; border-bottom: 1px solid #2a3446; transform: rotate(45deg) skew(10deg, 10deg); }
+.gubbe-stang { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #64748b; cursor: pointer; padding: 4px; }
+.gubbe-rubrik { font-size: 15.5px; font-weight: 800; color: #f1f5f9; padding-right: 24px; }
+.gubbe-under { font-size: 12px; color: #94a3b8; margin-top: 3px; }
+.gubbe-typer { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 10px; }
+.gubbe-typer button { background: transparent; color: #94a3b8; border: 1px solid #2a3446; border-radius: 999px; padding: 5px 10px;
+  font-size: 12.5px; cursor: pointer; transition: all .15s; }
+.gubbe-typer button.vald { background: #6ee7b71f; color: #6ee7b7; border-color: #6ee7b780; font-weight: 600; }
+.gubbe-bubbla textarea { width: 100%; box-sizing: border-box; background: #0f131b; color: #f1f5f9; border: 1px solid #2a3446;
+  border-radius: 10px; padding: 10px 12px; font-size: 14px; font-family: inherit; resize: none; outline: none; }
+.gubbe-bubbla textarea:focus { border-color: #6ee7b780; }
+.gubbe-skicka { margin-top: 10px; width: 100%; background: #6ee7b7; color: #0a0a0f; border: none; border-radius: 10px; padding: 10px;
+  font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.gubbe-skicka:disabled { opacity: .45; cursor: default; }
+.gubbe-tack { text-align: center; padding: 8px 0 4px; animation: gubbe-pop .35s cubic-bezier(.2,1.4,.4,1); }
+.gubbe-nyhet { background: #0f131b; border: 1px solid #1e2736; border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-size: 13px; color: #6ee7b7; }
+.gubbe-citat { color: #94a3b8; font-style: italic; margin-bottom: 4px; }
+@keyframes gubbe-pop { from { transform: scale(.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+
+@media (max-width: 700px) {
+  .feedback-gubbe { left: 8px; bottom: calc(70px + env(safe-area-inset-bottom)); }
+  .gubbe-knapp img { height: 50px; }
+  .gubbe-bubbla { left: 36px; bottom: 50px; }
+  .gubbe-hej { left: 40px; bottom: 46px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gubbe-knapp { animation: none; }
+  .gubbe-bubbla, .gubbe-hej, .gubbe-tack { transition: none; animation: none; }
+}
