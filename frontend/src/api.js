@@ -259,3 +259,8 @@ export async function ändraFeedback(id, status, svar) {
     const res = await fetch(`${API}/admin/feedback/${id}`, { method: "PATCH", headers: getHeaders(), body: JSON.stringify({ status, svar }) })
     return { ok: res.ok }
 }
+
+export async function taBortFeedback(id) {
+    const res = await fetch(`${API}/admin/feedback/${id}`, { method: "DELETE", headers: getHeaders() })
+    return { ok: res.ok }
+}

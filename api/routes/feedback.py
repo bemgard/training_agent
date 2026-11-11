@@ -160,3 +160,13 @@ def ändra_feedback(feedback_id: int, req: AdminÄndring, db=Depends(get_db), ad
         raise HTTPException(status_code=404, detail="Hittades inte")
     db.commit()
     return {"ok": True}
+
+
+@router.delete("/admin/feedback/{feedback_id}")
+def ta_bort_feedback(feedback_id: int, db=Depends(get_db), admin=Depends(kräv_admin)):
+    c = db.cursor()
+    c.execute(f"DELETE FROM feedback WHERE id = {ph}", (feedback_id,))
+    if c.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Hittades inte")
+    db.commit()
+    return {"ok": True}

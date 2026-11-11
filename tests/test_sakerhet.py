@@ -578,6 +578,12 @@ def test_feedback_och_admin(anv):
     assert klient.post(f"/api/feedback/{post['id']}/sett", headers=b).status_code == 200
     assert klient.get("/api/feedback/status", headers=b).json()["nyheter"] == []
 
+    # Bara admin kan ta bort
+    assert klient.delete(f"/api/admin/feedback/{post['id']}", headers=b).status_code == 403
+    assert klient.delete(f"/api/admin/feedback/{post['id']}", headers=a).status_code == 200
+    assert all(f["id"] != post["id"] for f in klient.get("/api/admin/feedback", headers=a).json()["feedback"])
+    assert klient.delete(f"/api/admin/feedback/{post['id']}", headers=a).status_code == 404
+
     # Validering
     for fel in [{"typ": "hack", "text": "x"}, {"typ": "ide", "text": "   "}, {"typ": "ide", "text": "x" * 2001}]:
         assert klient.post("/api/feedback", json=fel, headers=b).status_code == 422, fel

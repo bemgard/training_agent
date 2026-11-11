@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
-import { Inbox, ThumbsUp, ThumbsDown, Check } from "lucide-react"
-import { fetchInkorg, ändraFeedback } from "../api"
+import { Inbox, ThumbsUp, ThumbsDown, Check, Trash2 } from "lucide-react"
+import { fetchInkorg, ändraFeedback, taBortFeedback } from "../api"
 
 // Calles inkorg (bara admin): feedback från gubben och tummar ner på coachen
 const TYP = { fel: { ikon: "🐞", namn: "Fel", färg: "#f87171" }, ide: { ikon: "💡", namn: "Idé", färg: "#fbbf24" },
@@ -34,7 +34,17 @@ function Post({ f, onÄndrad }) {
           <span key={k} style={{ border: `1px solid ${C.border}`, borderRadius: 999, padding: "0 7px" }}>{k}: {v}</span>
         ))}
       </div>
-      <div style={{ fontSize: 14, color: C.text, marginTop: 8, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{f.text}</div>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 8 }}>
+        <div style={{ flex: 1, fontSize: 14, color: C.text, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{f.text}</div>
+        <button title="Ta bort" onClick={async () => {
+          if (!confirm("Ta bort den här feedbacken? Det går inte att ångra.")) return
+          const r = await taBortFeedback(f.id)
+          if (r.ok) onÄndrad()
+        }} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", padding: 4, flexShrink: 0 }}
+          onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = C.muted}>
+          <Trash2 size={15} />
+        </button>
+      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
         <select value={status} onChange={e => setStatus(e.target.value)}
           style={{ background: "#0f131b", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 8px", fontSize: 12.5 }}>
