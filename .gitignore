@@ -12,3 +12,7 @@ frontend/node_modules/
 frontend/dist/
 .DS_Store
 backups/
+
+# Graphify: lokal kodgraf och Claude Code-hookar (byggs om med `graphify update .`)
+graphify-out/
+.claude/
