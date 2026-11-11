@@ -104,10 +104,7 @@ export default function FeedbackGubbe({ flik, nyheter = [], onNyheterSedda }) {
         )}
       </div>
 
-      {/* Etiketten vid huvudet visas alltid; den större hälsningen ibland eller vid nyheter */}
-      {!(visaHej || harNyheter) && (
-        <button className="gubbe-etikett" onClick={() => setÖppen(true)} tabIndex={-1} aria-hidden="true">💬<span className="gubbe-etikett-text"> Feedback</span></button>
-      )}
+      {/* Liten hälsning ibland */}
       {!öppen && (visaHej || harNyheter) && (
         <button className="gubbe-hej" onClick={() => { setVisaHej(false); setÖppen(true) }}>
           {harNyheter ? "Jag har nyheter!" : "Tyck till?"}

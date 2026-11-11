@@ -63,23 +63,17 @@ body { background: #0a0a0f; }
 .gubbe-knapp { background: none; border: none; padding: 0; cursor: pointer; display: block; transform-origin: 0% 100%;
   transform: translateX(-44%) rotate(16deg); transition: transform .35s cubic-bezier(.2,1.2,.4,1); }
 .gubbe-knapp:hover, .feedback-gubbe.oppen .gubbe-knapp { transform: translateX(-6%) rotate(3deg); }
-.gubbe-knapp img { height: 92px; display: block; opacity: .9; transition: opacity .2s; transform-origin: 30% 100%;
+.gubbe-knapp img { height: 64px; display: block; opacity: .9; transition: opacity .2s; transform-origin: 30% 100%;
   animation: gubbe-vaj 7s ease-in-out infinite; }
 .gubbe-knapp:hover img { opacity: 1; }
 .gubbe-knapp.nyhet img { filter: drop-shadow(0 0 6px #6ee7b7aa); }
 @keyframes gubbe-vaj { 0%, 86%, 100% { transform: rotate(0) } 90% { transform: rotate(-7deg) } 95% { transform: rotate(5deg) } }
 
-/* Liten pratbubbla som alltid sitter vid huvudet så att man förstår vad gubben är till för */
-.gubbe-etikett { position: absolute; left: 44px; bottom: 66px; background: #f1f5f9; color: #0a0a0f; border: none; cursor: pointer;
-  border-radius: 12px 12px 12px 3px; padding: 4px 10px; font-size: 12px; font-weight: 700; white-space: nowrap;
-  box-shadow: 0 4px 14px #0007; transition: opacity .2s, transform .2s; }
-.gubbe-etikett:hover { transform: translateY(-2px); }
-.feedback-gubbe.oppen .gubbe-etikett { opacity: 0; pointer-events: none; }
-.gubbe-hej { position: absolute; left: 46px; bottom: 84px; background: #f1f5f9; color: #0a0a0f; border: none; cursor: pointer;
+.gubbe-hej { position: absolute; left: 34px; bottom: 60px; background: #f1f5f9; color: #0a0a0f; border: none; cursor: pointer;
   border-radius: 14px 14px 14px 4px; padding: 6px 12px; font-size: 13px; font-weight: 600; white-space: nowrap;
   box-shadow: 0 6px 20px #0008; animation: gubbe-pop .35s cubic-bezier(.2,1.4,.4,1); }
 
-.gubbe-bubbla { position: absolute; left: 46px; bottom: 86px; width: min(340px, calc(100vw - 70px));
+.gubbe-bubbla { position: absolute; left: 34px; bottom: 64px; width: min(340px, calc(100vw - 70px));
   background: #161b25; border: 1px solid #2a3446; border-radius: 18px 18px 18px 4px; padding: 18px 18px 16px;
   box-shadow: 0 18px 50px #000a; color: #e2e8f0;
   transform-origin: 0% 100%; transform: scale(.2); opacity: 0; pointer-events: none;
@@ -107,11 +101,9 @@ body { background: #0a0a0f; }
 
 @media (max-width: 700px) {
   .feedback-gubbe { bottom: calc(150px + env(safe-area-inset-bottom)); }
-  .gubbe-knapp img { height: 70px; }
-  .gubbe-bubbla { left: 34px; bottom: 66px; }
-  .gubbe-hej { left: 34px; bottom: 64px; }
-  .gubbe-etikett { left: 30px; bottom: 54px; font-size: 13px; padding: 4px 6px; border-radius: 12px 12px 12px 3px; }
-  .gubbe-etikett-text { display: none; }
+  .gubbe-knapp img { height: 52px; }
+  .gubbe-bubbla { left: 26px; bottom: 52px; }
+  .gubbe-hej { left: 26px; bottom: 50px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .gubbe-knapp, .gubbe-knapp img { animation: none; transition: none; }
