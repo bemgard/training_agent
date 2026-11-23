@@ -4,13 +4,15 @@ Training Agent is a full-stack web app that turns Garmin watch data into a perso
 
 The app is in use by a small group of friends. It is built and maintained by one developer.
 
-<!-- Screenshots: add images to docs/ and reference them here, e.g. ![Dashboard](docs/dashboard.png) -->
+![Dashboard: weekly summary, day-form check-in, training readiness and HRV](docs/dashboard.png)
 
 ## What it does
 
 **🧠 An AI coach that knows your training**
 - Chat with a Claude-powered coach. It gets a structured summary of your profile, personal records, heart-rate zones, weekly load, recent sessions, sleep, HRV and how you feel today.
 - Conversations are saved and streamed. History is always rebuilt on the server, never trusted from the client.
+
+![The coach reading your data and proposing a week of runs you can save as a plan](docs/coach.png)
 
 **📅 Training plans that sync to your watch**
 - The coach proposes dated sessions as a machine-readable block. That block is validated and saved as a weekly plan.
@@ -30,6 +32,8 @@ The app is in use by a small group of friends. It is built and maintained by one
 - An activity log grouped by day, with time in each heart-rate zone and intensity relative to your own history.
 - Personal goals and an "about me" profile.
 - Your own activity rules, for example "short runs at the football field are football".
+
+![Trends over a year: resting heart rate, HRV, VO2 max, sleep, readiness and training load](docs/trends.png)
 
 **💬 Built-in user feedback**
 - A small stick figure in the corner opens a speech-bubble feedback form. It captures context automatically: tab, device and screen width.
